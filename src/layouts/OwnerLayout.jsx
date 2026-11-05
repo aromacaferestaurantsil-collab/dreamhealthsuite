@@ -1,63 +1,116 @@
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useOwnerLayoutData } from '@/hooks/useOwnerLayoutData';
-import { APP_CONFIG } from '@/config/app.config';
-import { cn } from '@/lib/utils';
 import ApperIcon from '@/components/ApperIcon';
 import UserMenu from '@/components/UserMenu';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
-/**
- * Placeholder owner shell — a plain top bar so the app is navigable before it is designed.
- * Overwrite it with the app's own shell (Platform Contract §12). Whatever the shape, keep
- * the parts: nav from useOwnerLayoutData(), UserMenu once, the page through <Outlet /> in
- * <main>. This is a layout route: it receives no `children` prop.
- */
 export default function OwnerLayout() {
-  const { user, logout, homeRoute, navItems, navGroups, initials, displayName, counts } = useOwnerLayoutData();
-  const grouped = navGroups.length ? navGroups : [{ label: null, items: navItems }];
-  const [navOpen, setNavOpen] = useState(false);
-
-  const nav = grouped.map((g, i) => (
-    <div key={g.label ?? `g-${i}`} className="flex flex-wrap items-center gap-1">
-      {g.label && <span className="px-2 text-xs uppercase tracking-wide text-muted-foreground">{g.label}</span>}
-      {g.items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.to === '/'}
-          onClick={() => setNavOpen(false)}
-          className={({ isActive }) => cn(
-            'flex items-center gap-2 rounded-md px-3 py-2 text-sm',
-            isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground',
-          )}
-        >
-          <ApperIcon name={item.icon ?? 'Circle'} size={18} />
-          <span>{item.label}</span>
-          {counts[item.to] != null && <span className="text-xs text-muted-foreground">{counts[item.to]}</span>}
-        </NavLink>
-      ))}
-    </div>
-  ));
+  const { navItems, navGroups, displayName } = useOwnerLayoutData();
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const groups = navGroups?.length
+    ? navGroups
+    : [{ label: 'Workspace', items: navItems ?? [] }];
 
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <header className="flex h-(--spacing-header) items-center gap-4 border-b border-border px-4">
-        <Link to={homeRoute} className="flex items-center gap-2 font-heading text-lg">
-          <ApperIcon name={APP_CONFIG.icon} size={20} /> {APP_CONFIG.name}
-        </Link>
-        <nav className="hidden items-center gap-1 md:flex">{nav}</nav>
-        <button type="button" className="md:hidden" aria-label="Toggle navigation" onClick={() => setNavOpen((o) => !o)}>
-          <ApperIcon name="Menu" size={22} />
-        </button>
-        <div className="ml-auto">
-          <UserMenu user={user} initials={initials} displayName={displayName} logout={logout} />
+    <div className="min-h-screen bg-background md:flex">
+      <aside className={cn(
+        'hidden min-h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 md:flex',
+        collapsed ? 'w-20' : 'w-64'
+      )}>
+        <div className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <ApperIcon name="Stethoscope" size={22} />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="brand-heading text-lg font-black tracking-tight">HealthSuite</div>
+              <div className="text-xs text-muted-foreground">360 healthcare cloud</div>
+            </div>
+          )}
         </div>
-      </header>
-      {navOpen && <nav className="flex flex-col gap-1 border-b border-border p-2 md:hidden">{nav}</nav>}
-      <main className="p-4 md:p-6">
-        <ErrorBoundary><Outlet /></ErrorBoundary>
-      </main>
+        <div className="flex-1 overflow-y-auto px-3 py-5">
+          {groups.map((group, index) => (
+            <div key={group.label ?? index} className="mb-6">
+              {!collapsed && (
+                <div className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[0.18em] text-muted-foreground">
+                  {group.label}
+                </div>
+              )}
+              <nav className="space-y-1">
+                {(group.items ?? []).map(item => (
+                  <NavLink
+                    key={item.path ?? item.href ?? item.label}
+                    to={item.path ?? item.href ?? '/'}
+                    title={collapsed ? item.label : undefined}
+                    className={({ isActive }) => cn(
+                      'flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-bold transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      isActive && 'bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground'
+                    )}
+                  >
+                    <ApperIcon name={item.icon ?? 'Circle'} size={18} />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                  </NavLink>
+                ))}
+              </nav>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-sidebar-border p-3">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={() => setCollapsed(value => !value)}
+            aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          >
+            <ApperIcon name={collapsed ? 'PanelLeftOpen' : 'PanelLeftClose'} size={18} />
+            {!collapsed && <span className="ml-2">Collapse menu</span>}
+          </Button>
+        </div>
+      </aside>
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card/95 px-4 backdrop-blur md:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary md:hidden">
+              <ApperIcon name="Stethoscope" size={19} />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold">HealthSuite 360</div>
+              <div className="text-xs text-muted-foreground">Connected healthcare operations</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="hidden text-right sm:block">
+              <div className="text-sm font-bold">{displayName ?? 'Workspace user'}</div>
+              <div className="text-xs text-muted-foreground">Secure workspace</div>
+            </div>
+            <UserMenu />
+          </div>
+        </header>
+        <main className="w-full flex-1 p-4 md:p-8">
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
+        </main>
+        <nav className="sticky bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card px-1 py-2 md:hidden">
+          {(navItems ?? []).slice(0, 5).map(item => (
+            <NavLink
+              key={item.path ?? item.href ?? item.label}
+              to={item.path ?? item.href ?? '/'}
+              className={({ isActive }) => cn(
+                'flex flex-col items-center gap-1 rounded-md py-1 text-[10px] font-bold text-muted-foreground',
+                isActive && 'text-primary'
+              )}
+            >
+              <ApperIcon name={item.icon ?? 'Circle'} size={18} />
+              <span className="max-w-full truncate">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </div>
     </div>
   );
 }
