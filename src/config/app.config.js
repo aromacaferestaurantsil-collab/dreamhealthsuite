@@ -12,7 +12,7 @@ export const AUTH_PROFILES = [
     key: 'super-admin',
     name: 'Admin_c',
     label: 'Super Admin',
-    profileSlug: 'super-admin',
+    profileSlug: '',
     redirectAfterAuth: '/',
     hasSignup: false,
     reportsTo: null,

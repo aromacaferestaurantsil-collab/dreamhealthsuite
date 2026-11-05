@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ListSkeleton } from '@/components/PageSkeleton';
 
 export const route = { path: '/tenants', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Building2', label: 'Businesses', order: 3, profiles: ['Super Admin'] };
+export const nav = { icon: 'Building2', label: 'Businesses', order: 3, profiles: ['Admin_c'] };
 
 const FIELDS = ['Name', 'business_type_c', 'status_c', 'modules_c', 'subscription_plan_c', 'email_c', 'phone_c'];
 

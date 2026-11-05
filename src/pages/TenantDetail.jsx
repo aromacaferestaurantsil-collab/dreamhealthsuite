@@ -53,6 +53,7 @@ export default function TenantDetail() {
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Licensed product modules</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{(tenant.modules_c ?? []).length ? tenant.modules_c.map(module => <Badge key={module} variant="secondary">{module}</Badge>) : <p className="text-sm text-muted-foreground">No modules assigned yet.</p>}</CardContent></Card>
       <div className="flex flex-wrap justify-end gap-3">
+        <Button asChild variant="outline"><Link to={`/tenants/${id}/edit`}>Edit business</Link></Button>
         <Button asChild variant="outline"><Link to="/modules">Explore modules</Link></Button>
         <AlertDialog>
           <AlertDialogTrigger asChild><Button variant="destructive"><ApperIcon name="Trash2" size={16} className="mr-2" /> Delete record</Button></AlertDialogTrigger>
