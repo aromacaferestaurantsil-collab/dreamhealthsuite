@@ -1,0 +1,172 @@
+{
+  "_meta": {
+    "_table": {
+      "label": "Business tenant",
+      "plural": "Business tenants",
+      "icon": "Building2"
+    },
+    "Name": {
+      "type": "Text",
+      "label": "Organisation name",
+      "required": true
+    },
+    "business_type_c": {
+      "type": "Picklist",
+      "label": "Business type",
+      "values": "Pharmacy,Diagnostic Centre,Clinic,Doctor Practice,Hospital,Healthcare Group"
+    },
+    "status_c": {
+      "type": "Picklist",
+      "label": "Tenant status",
+      "values": "Trial,Active,Pending,Suspended,Expired"
+    },
+    "modules_c": {
+      "type": "MultiPicklist",
+      "label": "Licensed modules",
+      "values": "PharmaSuite,LabSuite,DoctorSuite,PatientSuite,CareConnect,HealthAnalytics"
+    },
+    "subscription_plan_c": {
+      "type": "Picklist",
+      "label": "Subscription plan",
+      "values": "Starter,Professional,Enterprise,Lifetime,Custom"
+    },
+    "email_c": {
+      "type": "Email",
+      "label": "Business email"
+    },
+    "phone_c": {
+      "type": "Text",
+      "label": "Business phone"
+    },
+    "address_c": {
+      "type": "MultilineText",
+      "label": "Registered address"
+    },
+    "gstin_c": {
+      "type": "Text",
+      "label": "GSTIN"
+    }
+  },
+  "records": [
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000001",
+      "Name": "Northstar Pharmacy Group",
+      "business_type_c": "Pharmacy",
+      "status_c": "Active",
+      "modules_c": ["PharmaSuite", "PatientSuite", "CareConnect"],
+      "subscription_plan_c": "Professional",
+      "email_c": "ops@example.com",
+      "phone_c": "0000000001",
+      "address_c": "Silchar, Assam",
+      "gstin_c": "GST-DEMO-001",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-11-05T04:00:00.000Z",
+      "ModifiedOn": "2026-11-05T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000002",
+      "Name": "Cachar Diagnostics",
+      "business_type_c": "Diagnostic Centre",
+      "status_c": "Trial",
+      "modules_c": ["LabSuite", "PatientSuite"],
+      "subscription_plan_c": "Starter",
+      "email_c": "lab@example.com",
+      "phone_c": "0000000002",
+      "address_c": "Silchar, Assam",
+      "gstin_c": "GST-DEMO-002",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-11-04T04:00:00.000Z",
+      "ModifiedOn": "2026-11-04T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000003",
+      "Name": "Green Valley Clinic",
+      "business_type_c": "Clinic",
+      "status_c": "Active",
+      "modules_c": ["DoctorSuite", "PatientSuite"],
+      "subscription_plan_c": "Professional",
+      "email_c": "clinic@example.com",
+      "phone_c": "0000000003",
+      "address_c": "Meherpur, Silchar",
+      "gstin_c": "GST-DEMO-003",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-11-03T04:00:00.000Z",
+      "ModifiedOn": "2026-11-03T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000004",
+      "Name": "Dr Sen Family Practice",
+      "business_type_c": "Doctor Practice",
+      "status_c": "Pending",
+      "modules_c": ["DoctorSuite", "PatientSuite"],
+      "subscription_plan_c": "Starter",
+      "email_c": "doctor@example.com",
+      "phone_c": "0000000004",
+      "address_c": "Silchar, Assam",
+      "gstin_c": "GST-DEMO-004",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-11-02T04:00:00.000Z",
+      "ModifiedOn": "2026-11-02T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000005",
+      "Name": "Eastern Health Network",
+      "business_type_c": "Healthcare Group",
+      "status_c": "Active",
+      "modules_c": ["PharmaSuite", "LabSuite", "DoctorSuite", "PatientSuite", "CareConnect", "HealthAnalytics"],
+      "subscription_plan_c": "Enterprise",
+      "email_c": "network@example.com",
+      "phone_c": "0000000005",
+      "address_c": "Assam, India",
+      "gstin_c": "GST-DEMO-005",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-11-01T04:00:00.000Z",
+      "ModifiedOn": "2026-11-01T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000006",
+      "Name": "Riverbend Pharmacy",
+      "business_type_c": "Pharmacy",
+      "status_c": "Expired",
+      "modules_c": ["PharmaSuite"],
+      "subscription_plan_c": "Starter",
+      "email_c": "owner@example.com",
+      "phone_c": "0000000006",
+      "address_c": "Hailakandi, Assam",
+      "gstin_c": "GST-DEMO-006",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-10-31T04:00:00.000Z",
+      "ModifiedOn": "2026-10-31T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000007",
+      "Name": "LifeLine Pathology",
+      "business_type_c": "Diagnostic Centre",
+      "status_c": "Active",
+      "modules_c": ["LabSuite", "PatientSuite", "HealthAnalytics"],
+      "subscription_plan_c": "Professional",
+      "email_c": "pathology@example.com",
+      "phone_c": "0000000007",
+      "address_c": "Karimganj, Assam",
+      "gstin_c": "GST-DEMO-007",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-10-30T04:00:00.000Z",
+      "ModifiedOn": "2026-10-30T04:00:00.000Z"
+    },
+    {
+      "Id": "34ad1001-2d00-4c01-9000-000000000008",
+      "Name": "Hope Multi-Speciality",
+      "business_type_c": "Hospital",
+      "status_c": "Trial",
+      "modules_c": ["DoctorSuite", "LabSuite", "PatientSuite", "CareConnect"],
+      "subscription_plan_c": "Custom",
+      "email_c": "hospital@example.com",
+      "phone_c": "0000000008",
+      "address_c": "Guwahati, Assam",
+      "gstin_c": "GST-DEMO-008",
+      "Owner": { "Id": "a41c9d27-5e8f-4b06-9c3a-d7f218e64b90", "Name": "Demo Admin" },
+      "CreatedOn": "2026-10-29T04:00:00.000Z",
+      "ModifiedOn": "2026-10-29T04:00:00.000Z"
+    }
+  ]
+}

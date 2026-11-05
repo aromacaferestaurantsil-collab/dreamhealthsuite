@@ -1,11 +1,6 @@
-const ROOT_PROFILES = ['Super Admin'];
-const OWNER_PROFILES = ['Super Admin', 'Business Owner'];
+const ROOT_PROFILE = 'Admin_c';
 
-function profile(user) {
-  return user?.profile?.name ?? user?.accounts?.[0]?.profile?.name ?? '';
-}
-
-export const select = (record, user) => ROOT_PROFILES.includes(profile(user)) || OWNER_PROFILES.includes(profile(user));
-export const insert = (record, user) => ROOT_PROFILES.includes(profile(user));
-export const update = (record, user) => ROOT_PROFILES.includes(profile(user));
-export const remove = (record, user) => ROOT_PROFILES.includes(profile(user));
+export const select = (record, user) => user?.profile === ROOT_PROFILE;
+export const insert = (record, user) => user?.profile === ROOT_PROFILE;
+export const update = (record, user) => user?.profile === ROOT_PROFILE;
+export const remove = (record, user) => user?.profile === ROOT_PROFILE;
