@@ -1,37 +1,36 @@
 export const APP_CONFIG = {
-  appName: 'HealthSuite 360',
-  appTagline: 'One connected workspace for healthcare operations',
-  logo: '',
-  primaryColor: '#A52A6F',
-  defaultLoginRoute: '/super-admin/login',
-  redirectAfterAuth: '/'
+  name: 'HealthSuite 360',
+  tagline: 'One connected workspace for healthcare operations',
+  emoji: '⚕️',
+  icon: 'Stethoscope',
+  defaultTheme: 'system',
+  defaultLoginRoute: '/super-admin/login'
 };
 
 export const AUTH_PROFILES = [
   {
     key: 'super-admin',
-    name: 'Super Admin',
-    description: 'Platform owner and global operations',
+    name: 'Admin_c',
+    label: 'Super Admin',
+    profileSlug: 'super-admin',
     redirectAfterAuth: '/',
-    hasSignup: false
-  },
-  {
-    key: 'tenant-admin',
-    name: 'Business Owner',
-    description: 'Pharmacy, laboratory, clinic and healthcare business owners',
-    redirectAfterAuth: '/',
-    hasSignup: true
-  },
-  {
-    key: 'staff',
-    name: 'Staff Member',
-    description: 'Authorised team members',
-    redirectAfterAuth: '/',
-    hasSignup: false
+    hasSignup: false,
+    reportsTo: null,
+    authPage: {
+      loginTitle: 'HealthSuite 360',
+      signupTitle: 'Super Admin access',
+      loginDescription: 'Sign in to manage the healthcare platform.',
+      signupDescription: 'Super Admin accounts are created by the platform owner.'
+    },
+    altLinksLeadIn: 'Platform access',
+    altLinks: []
   }
 ];
 
 export const GENERIC_AUTH = {
-  enabled: true,
-  allowSignup: false
+  loginTitle: 'Welcome to HealthSuite 360',
+  signupTitle: 'Create a HealthSuite account',
+  loginDescription: 'Secure access to healthcare operations.',
+  signupDescription: 'Ask your platform administrator for an invitation.',
+  redirectAfterAuth: '/'
 };

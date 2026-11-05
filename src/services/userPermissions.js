@@ -1,35 +1,24 @@
-export const PROFILES = [
-  {
-    name: 'Super Admin',
-    key: 'super-admin',
-    description: 'Platform owner with global authority',
-    reportsTo: null,
-    canManageTeam: true
-  },
-  {
-    name: 'Business Owner',
-    key: 'tenant-admin',
-    description: 'Owns a tenant and its licensed modules',
-    reportsTo: null,
-    canManageTeam: true
-  },
-  {
-    name: 'Staff Member',
-    key: 'staff',
-    description: 'Works within assigned tenant and module permissions',
-    reportsTo: 'Business Owner',
-    canManageTeam: false
+import { createPermissions } from '@/services/permissions';
+
+export const PROFILES = {
+  Admin_c: {
+    label: 'Super Admin',
+    isDefault: true,
+    isPublic: false,
+    canManageTeam: true,
+    reportsTo: null
   }
-];
+};
 
-export function getProfileMeta(profileName) {
-  return PROFILES.find(profile => profile.name === profileName) ?? null;
-}
+export const TABLE_PERMISSIONS = {
+  Admin_c: {
+    tenants_c: { access: 'Full' },
+    subscriptions_c: { access: 'Full' }
+  }
+};
 
-export function getTableAccess(profileName) {
-  return profileName === 'Super Admin' || profileName === 'Business Owner';
-}
+const permissions = createPermissions(PROFILES, TABLE_PERMISSIONS);
 
-export function getFieldAccess() {
-  return true;
-}
+export const getProfileMeta = permissions.getProfileMeta;
+export const getTableAccess = permissions.getTableAccess;
+export const getFieldAccess = permissions.getFieldAccess;
