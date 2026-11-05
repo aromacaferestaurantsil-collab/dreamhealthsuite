@@ -11,19 +11,20 @@ export const AUTH_PROFILES = [
   {
     key: 'super-admin',
     name: 'Admin_c',
-    label: 'Super Admin',
-    profileSlug: '',
+    profileSlug: "|AGL0D0zG3j5ZL90pf5WyTp85z0NTHx20CaXaBULon2Q=",
     redirectAfterAuth: '/',
-    hasSignup: false,
-    reportsTo: null,
     authPage: {
-      loginTitle: 'HealthSuite 360',
-      signupTitle: 'Super Admin access',
-      loginDescription: 'Sign in to manage the healthcare platform.',
-      signupDescription: 'Super Admin accounts are created by the platform owner.'
+      loginTitle: 'Super Admin Sign In',
+      signupTitle: 'Create Super Admin Account',
+      loginDescription: null,
+      signupDescription: null,
     },
-    altLinksLeadIn: 'Platform access',
-    altLinks: []
+    altLinksLeadIn: 'Go to the right portal',
+    altLinks: [
+
+    ],
+    reportsTo: null,
+    hasSignup: false,
   }
 ];
 
