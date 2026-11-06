@@ -53,7 +53,7 @@ export default function LicenseCenter() {
   const shareLinks = useMemo(() => {
     if (!issued) return null;
     const plan = planRows.find(item => String(item.Id) === String(issued.planId));
-    const download = plan?.download_url_c || 'Download link will be shared by the HealthSuite 360 team.';
+    const download = issued.downloadUrl || plan?.download_url_c || 'Download link will be shared by the HealthSuite 360 team.';
     const message = 'HealthSuite 360 download and activation details for ' + issued.businessName + '\nDownload: ' + download + '\nOne-time activation key: ' + issued.licenseKey + '\nKey expires: ' + new Date(issued.expiresOn).toLocaleString();
     const phone = String(issued.phone || '').replace(/\D/g, '');
     return {
@@ -163,7 +163,8 @@ export default function LicenseCenter() {
       businessName: request.business_name_c,
       phone: request.phone_c,
       email: request.email_c,
-      planId: request.plan_c?.Id
+      planId: request.plan_c?.Id || request.plan_c,
+      downloadUrl: response.downloadUrl
     });
     reloadRequests();
   }
