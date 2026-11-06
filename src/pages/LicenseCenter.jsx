@@ -29,6 +29,7 @@ function dateAfter(days) {
 export default function LicenseCenter() {
   const [tab, setTab] = useState('requests');
   const [saving, setSaving] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState('');
   const [manual, setManual] = useState({ business_name_c: '', phone_c: '', email_c: '', business_type_c: 'Clinic', plan_c: '', trial_days_c: '30' });
   const [planForm, setPlanForm] = useState({ Name: '', product_c: 'PharmaSuite', description_c: '', price_c: '', offer_price_c: '', currency_c: 'INR', billing_cycle_c: 'Monthly', default_trial_days_c: '30', is_active_c: true, download_url_c: '', sort_order_c: '1' });
   const [issued, setIssued] = useState(null);
@@ -69,16 +70,20 @@ export default function LicenseCenter() {
     }
     setSaving(true);
     try {
-      const result = await sdk.table('plans_c').create({
+      const payload = {
         ...planForm,
         price_c: Number(planForm.price_c),
         offer_price_c: Number(planForm.offer_price_c || 0),
         default_trial_days_c: Number(planForm.default_trial_days_c || 30),
         sort_order_c: Number(planForm.sort_order_c || 1)
-      });
+      };
+      const result = editingPlanId
+        ? await sdk.table('plans_c').update({ Id: editingPlanId, ...payload })
+        : await sdk.table('plans_c').create(payload);
       if (result.messages?.length) toast.error(result.messages[0]);
       if (!result.data?.length) return;
-      toast.success('Plan published to the online catalogue');
+      toast.success(editingPlanId ? 'Plan pricing and trial settings updated' : 'Plan published to the online catalogue');
+      setEditingPlanId('');
       setPlanForm({ Name: '', product_c: 'PharmaSuite', description_c: '', price_c: '', offer_price_c: '', currency_c: 'INR', billing_cycle_c: 'Monthly', default_trial_days_c: '30', is_active_c: true, download_url_c: '', sort_order_c: '1' });
       reloadPlans();
     } catch (error) {
@@ -262,7 +267,10 @@ export default function LicenseCenter() {
                   <div className="space-y-1"><Label>Display order</Label><Input type="number" min="1" value={planForm.sort_order_c} onChange={event => setPlanForm(current => ({ ...current, sort_order_c: event.target.value }))} /></div>
                 </div>
                 <div className="space-y-1"><Label>Actual software download URL *</Label><Input required type="url" value={planForm.download_url_c} onChange={event => setPlanForm(current => ({ ...current, download_url_c: event.target.value }))} placeholder="https://your-domain.com/downloads/installer" /></div>
-                <Button type="submit" disabled={saving}>{saving ? 'Publishing…' : 'Publish plan'}</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={saving}>{saving ? 'Saving…' : editingPlanId ? 'Save plan changes' : 'Publish plan'}</Button>
+                  {editingPlanId && <Button type="button" variant="outline" onClick={() => { setEditingPlanId(''); setPlanForm({ Name: '', product_c: 'PharmaSuite', description_c: '', price_c: '', offer_price_c: '', currency_c: 'INR', billing_cycle_c: 'Monthly', default_trial_days_c: '30', is_active_c: true, download_url_c: '', sort_order_c: '1' }); }}>Cancel edit</Button>}
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -271,7 +279,10 @@ export default function LicenseCenter() {
             <CardContent className="space-y-3">
               {plansLoading ? <p className="text-sm text-muted-foreground">Loading plans…</p> : planRows.length ? planRows.map(plan => <div key={plan.Id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
                 <div><div className="font-bold">{plan.Name}</div><div className="text-xs text-muted-foreground">{plan.product_c} · {plan.billing_cycle_c} · {plan.default_trial_days_c || 30} day trial</div><div className="mt-1 text-sm"><span className="text-muted-foreground line-through">{plan.currency_c} {Number(plan.price_c || 0).toLocaleString('en-IN')}</span> <b>{plan.currency_c} {Number(plan.offer_price_c > 0 && plan.offer_price_c < plan.price_c ? plan.offer_price_c : plan.price_c || 0).toLocaleString('en-IN')}</b></div></div>
-                <Badge variant={plan.is_active_c ? 'default' : 'secondary'}>{plan.is_active_c ? 'Published' : 'Hidden'}</Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant={plan.is_active_c ? 'default' : 'secondary'}>{plan.is_active_c ? 'Published' : 'Hidden'}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => { setEditingPlanId(plan.Id); setPlanForm({ Name: plan.Name || '', product_c: plan.product_c || 'PharmaSuite', description_c: plan.description_c || '', price_c: String(plan.price_c ?? ''), offer_price_c: String(plan.offer_price_c ?? ''), currency_c: plan.currency_c || 'INR', billing_cycle_c: plan.billing_cycle_c || 'Monthly', default_trial_days_c: String(plan.default_trial_days_c || 30), is_active_c: Boolean(plan.is_active_c), download_url_c: plan.download_url_c || '', sort_order_c: String(plan.sort_order_c || 1) }); setTab('plans'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Edit price / trial</Button>
+                </div>
               </div>) : <p className="text-sm text-muted-foreground">No plans published yet.</p>}
             </CardContent>
           </Card>
