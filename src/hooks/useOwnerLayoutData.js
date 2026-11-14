@@ -1,8 +1,6 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { APP_CONFIG, AUTH_PROFILES, GENERIC_AUTH } from '@/config/app.config';
-import { useFetch } from '@/hooks/useFetch';
-import { sdk } from '@/services/sdk';
 
 // Auto-discover nav items and footer pages from page exports
 const pageMods = import.meta.glob('/src/pages/**/*.jsx', { eager: true });
@@ -16,25 +14,6 @@ const navPaths = new Set(discoveredNavItems.map((n) => n.to));
 const footerPages = Object.entries(pageMods)
   .filter(([, mod]) => mod.route && mod.route.layout === 'owner' && mod.route.access !== 'public' && !mod.route.path.includes(':') && !navPaths.has(mod.route.path))
   .map(([, mod]) => ({ ...mod.route, to: mod.route.path, href: mod.route.path }));
-
-const countItems = discoveredNavItems.filter((item) => item.count?.table);
-
-async function fetchCounts() {
-  if (!countItems.length) return {};
-  const results = await Promise.all(countItems.map((item) =>
-    sdk.table(item.count.table)
-      .select([{ field: 'Id' }])
-      .aggregate([{ id: 'c', fields: [{ field: 'Id', fn: 'Count', alias: 'count' }], ...(item.count.where ? { where: item.count.where } : {}) }])
-      .limit(1)
-      .fetch()
-  ));
-  const counts = {};
-  countItems.forEach((item, i) => {
-    const bucket = results[i]?.aggregators?.find((a) => a.id === 'c');
-    counts[item.to] = bucket?.data?.count ?? bucket?.count ?? bucket?.value ?? 0;
-  });
-  return counts;
-}
 
 // The single data source for OwnerLayout: auth, nav discovery, profile filtering,
 // section grouping, footer pages, nav count badges, and the post-login home route.
@@ -72,7 +51,5 @@ export function useOwnerLayoutData() {
     || APP_CONFIG.name.slice(0, 2).toUpperCase();
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.emailAddress;
 
-  const { data: counts, run: refreshCounts } = useFetch(fetchCounts, []);
-
-  return { user, logout, homeRoute, navItems, navGroups, footerPages, initials, displayName, counts: counts ?? {}, refreshCounts };
+  return { user, logout, homeRoute, navItems, navGroups, footerPages, initials, displayName, counts: {}, refreshCounts: () => {} };
 }
