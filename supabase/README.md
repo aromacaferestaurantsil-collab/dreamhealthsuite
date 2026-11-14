@@ -56,3 +56,13 @@ Set these in the hosting provider's environment settings (not in source control)
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 Never expose the Supabase service-role key to browser code.
+
+
+## Tenant onboarding implementation update (2026-11-15)
+
+- Added `src/pages/WorkspaceOnboarding.jsx`, which calls the authenticated `create_tenant_with_owner` RPC. It collects legal/display names, slug and first-branch details; it does not write tenant tables directly from the browser.
+- Updated `RootLayout` to route authenticated users with no active membership to `/workspace/new`, and route existing members away from that page.
+- This is code-level implementation only. Signup confirmation, owner bootstrap, membership refresh, duplicate-slug handling and multi-tenant switching still require browser tests with real test accounts.
+- The current Supabase migration history contains six post-baseline migrations only. It still does **not** recreate the original 31-table schema from an empty database. Do not reset the live project or use this repository as a blank-database restore until the foundational schema, policies, indexes, triggers and grants have been reconstructed and replay-tested.
+- The Supabase security advisor currently reports two warnings for authenticated execution of SECURITY DEFINER RPCs: `public.create_tenant_with_owner` and `public.lab_verify_result`. These are intended privileged workflows but need a formal permission review and negative tests. Health advisor currently reports no lints.
+- No authenticated tenant/branch isolation tests, clinical module workflow tests, or successful frontend build have yet been recorded.
