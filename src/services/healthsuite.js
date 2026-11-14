@@ -15,7 +15,7 @@ export async function getMyMemberships() {
   return data??[];
 }
 export async function createTenant({legalName,displayName,slug,branchName,branchCode}) {
-  const {data,error}=await requireSupabase().schema('private').rpc('create_tenant_with_owner',{
+  const {data,error}=await requireSupabase().rpc('create_tenant_with_owner',{
     p_legal_name:legalName,p_display_name:displayName,p_slug:slug,p_branch_name:branchName,p_branch_code:branchCode,
   });
   if(error) throw error;
