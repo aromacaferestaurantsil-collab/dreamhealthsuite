@@ -1,7 +1,7 @@
 # HealthSuite 360 database and migration status
 
 ## Connected Supabase project
-- Project: `healthsuite-360`
+- Project name: not confirmed; this is an existing Supabase project, not a newly provisioned dedicated HealthSuite 360 project.
 - Project ref: `whahizgrklmmspioyrhp`
 - Region: `ap-south-1` (Mumbai)
 - API URL: `https://whahizgrklmmspioyrhp.supabase.co`
