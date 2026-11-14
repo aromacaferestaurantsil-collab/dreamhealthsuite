@@ -30,7 +30,7 @@ All 31 tables were observed with RLS enabled at the time of this inventory. The 
 The first three were copied from the database migration history. The last two harden RPC grants, tenant owner protection, and the lab-result workflow.
 
 ## Important baseline limitation
-The original table/schema foundation predates the versioned migration history currently visible in Supabase. It has not yet been reconstructed as a complete, tested baseline migration. Therefore this folder is **not yet a complete blank-database rebuild package**. Do not reset or recreate the production database from these migrations alone.
+The original table/schema foundation predates the versioned migration history currently visible in Supabase. Catalog inspection has confirmed the current 31-table structure, columns, constraints, indexes, policies, triggers, and functions, but the full DDL has not yet been assembled into an ordered, replay-tested baseline migration. Therefore this folder is **not yet a complete blank-database rebuild package**. Do not reset or recreate the production database from these migrations alone.
 
 Before a fresh environment can be provisioned, create and review a baseline containing every table, column, default, constraint, index, RLS policy, trigger, function, grant, and extension, then test it against a disposable Supabase project.
 
@@ -42,12 +42,13 @@ Before a fresh environment can be provisioned, create and review a baseline cont
 - Advisor checks are not a substitute for authenticated integration tests.
 
 ## Application migration status
-The React/Vite repository has the Supabase client and service layer scaffolding, but authentication, tenant context, and module screens still contain Apper SDK dependencies. The UI has **not** yet been switched wholesale to Supabase. Do not advertise the web app as fully migrated or production-ready until:
-1. Supabase Auth replaces/bridges the current Apper session lifecycle.
-2. Tenant and branch context is loaded from the signed-in user's active memberships.
-3. Each module screen uses the canonical Postgres schema and RPC workflows.
-4. Tenant-isolation, role, branch, module-entitlement, and workflow tests pass.
-5. A production build and deployed smoke test pass.
+The React/Vite repository now uses Supabase Auth for email/password login and registration, loads active tenant memberships in the root auth context, exposes a tenant context hook, and provides a workspace switcher. The Pharmacy POS has been switched to tenant-scoped Supabase queries and the transactional checkout RPC. The general Pharmacy catalogue, PatientSuite, LabSuite, DoctorSuite, CareConnect, and HealthAnalytics screens still contain Apper SDK dependencies. The UI has **not** yet been switched wholesale to Supabase. Do not advertise the web app as fully migrated or production-ready until:
+1. Reconstruct all baseline DDL, grants, policies, triggers, functions and extensions into ordered, replay-tested migrations.
+2. Validate Supabase Auth confirmation, password reset, session expiry and account recovery.
+3. Complete tenant onboarding and branch context selection for memberships with no default branch.
+4. Migrate the Pharmacy catalogue, PatientSuite, LabSuite, DoctorSuite, CareConnect and HealthAnalytics screens to the canonical Postgres schema.
+5. Tenant-isolation, role, branch, module-entitlement and workflow integration tests pass.
+6. A production build and deployed smoke test pass.
 
 ## Deployment configuration
 Set these in the hosting provider's environment settings (not in source control):
