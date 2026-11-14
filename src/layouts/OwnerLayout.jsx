@@ -5,10 +5,12 @@ import ApperIcon from '@/components/ApperIcon';
 import UserMenu from '@/components/UserMenu';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/layouts/RootLayout';
 import { cn } from '@/lib/utils';
 
 export default function OwnerLayout() {
   const { navItems, navGroups, displayName } = useOwnerLayoutData();
+  const { memberships, activeTenant, setActiveTenant } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const groups = navGroups?.length
@@ -79,10 +81,11 @@ export default function OwnerLayout() {
             </div>
             <div>
               <div className="text-sm font-extrabold">HealthSuite 360</div>
-              <div className="text-xs text-muted-foreground">Connected healthcare operations</div>
+              <div className="text-xs text-muted-foreground">{activeTenant?.tenants?.display_name ?? "No workspace selected"}</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {memberships.length > 1 && <select aria-label="Select workspace" value={activeTenant?.tenant_id ?? ""} onChange={event => setActiveTenant(event.target.value)} className="max-w-44 rounded-md border border-border bg-background px-2 py-1 text-xs">{memberships.map(m => <option key={m.tenant_id} value={m.tenant_id}>{m.tenants?.display_name ?? m.tenant_id}</option>)}</select>}
             <div className="hidden text-right sm:block">
               <div className="text-sm font-bold">{displayName ?? 'Workspace user'}</div>
               <div className="text-xs text-muted-foreground">Secure workspace</div>
