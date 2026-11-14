@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import ApperIcon from '@/components/ApperIcon';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,16 @@ const catalogue = {
 };
 
 export default function ModuleWorkspace() {
-  const { module } = useParams();
+  const location = useLocation();
+  const routeModules = {
+    '/pharmacy': 'pharmacy',
+    '/laboratory': 'laboratory',
+    '/doctors': 'doctors',
+    '/patients': 'patients',
+    '/care-connect': 'care-connect',
+    '/analytics': 'analytics'
+  };
+  const module = routeModules[location.pathname] || location.pathname.split('/').filter(Boolean).pop();
   const product = catalogue[module];
   if (!product) return <div><Link to="/modules">Back to product modules</Link><p className="mt-5">Module workspace not found.</p></div>;
 
