@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase, requireSupabase } from '@/lib/supabase';
-import { AuthLayout } from './AuthLayout';
+import AuthLayout from './AuthLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
