@@ -79,6 +79,8 @@ export default function RootLayout() {
     }
   };
   const activeTenant = useMemo(()=>memberships.find(m=>m.tenant_id===activeTenantId)??null,[memberships,activeTenantId]);
+  useEffect(() => { if (user && /^\/(?:[\w-]+\/)?(?:login|signup)$/.test(location.pathname)) navigate('/', { replace: true }); }, [user, location.pathname, navigate]);
+
   const deepestMatch = matches[matches.length-1];
   const accessRule = deepestMatch?.handle?.access ?? 'public';
   const allowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
