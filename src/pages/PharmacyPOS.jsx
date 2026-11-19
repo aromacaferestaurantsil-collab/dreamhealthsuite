@@ -22,6 +22,7 @@ export default function PharmacyPOS() {
   const [search,setSearch] = useState('');
   const [cart,setCart] = useState([]);
   const [payment,setPayment] = useState('cash');
+  const [paymentConfirmed,setPaymentConfirmed] = useState(false);
   const [loading,setLoading] = useState(false);
   const [saving,setSaving] = useState(false);
 
@@ -58,12 +59,14 @@ export default function PharmacyPOS() {
   }
   async function checkout() {
     if(!tenantId || !branchId || !cart.length) return toast.error('Select a branch and add at least one medicine');
+    if(!paymentConfirmed) return toast.error('Confirm that payment has actually been received before completing the sale');
     setSaving(true);
     try {
       const invoiceNumber='HS-'+Date.now().toString(36).toUpperCase();
       const saleId=await pharmacyCheckout({tenantId,branchId,invoiceNumber,items:cart.map(x=>({medicine_id:x.medicineId,quantity:x.quantity,unit_price:x.price})),paymentMethod:payment});
       toast.success('Sale completed · '+invoiceNumber);
       setCart([]);
+      setPaymentConfirmed(false);
       await load();
     } catch(e) { toast.error(e.message || 'Checkout failed'); }
     finally { setSaving(false); }
@@ -82,9 +85,10 @@ export default function PharmacyPOS() {
         {cart.map(line=><div key={line.medicineId} className="flex items-center justify-between gap-2 border-b pb-2 text-sm"><div className="min-w-0"><div className="font-medium">{line.name}</div><div className="text-xs text-muted-foreground">{money(line.price)} · GST {line.gst}%</div></div><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={()=>setCart(old=>old.map(x=>x.medicineId===line.medicineId?{...x,quantity:Math.max(1,x.quantity-1)}:x))}>−</Button><span>{line.quantity}</span><Button size="sm" variant="outline" onClick={()=>add(medicines.find(m=>m.id===line.medicineId))}>+</Button><Button size="sm" variant="ghost" onClick={()=>setCart(old=>old.filter(x=>x.medicineId!==line.medicineId))}>×</Button></div></div>)}
         {!cart.length&&<p className="text-sm text-muted-foreground">Add medicines to begin a sale.</p>}
         <div className="space-y-1 border-t pt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="flex justify-between"><span>GST</span><span>{money(tax)}</span></div><div className="flex justify-between text-base font-bold"><span>Total</span><span>{money(total)}</span></div></div>
-        <select aria-label="Payment method" value={payment} onChange={e=>setPayment(e.target.value)} className="w-full rounded-md border bg-background p-2 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option></select>
-        <Button className="w-full" disabled={saving || !cart.length || !branchId} onClick={checkout}>{saving?'Processing…':'Complete sale'}</Button>
-        <p className="text-xs text-muted-foreground">Checkout uses a database transaction and FEFO batch depletion. Confirm that payment has actually been received before completing a sale.</p>
+        <select aria-label="Payment method" value={payment} onChange={e=>{setPayment(e.target.value);setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option></select>
+        <label className="flex items-start gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)} className="mt-0.5" /><span>I confirm that the customer’s payment has actually been received by the selected method.</span></label>
+        <Button className="w-full" disabled={saving || !cart.length || !branchId || !paymentConfirmed} onClick={checkout}>{saving?'Processing…':'Complete paid sale'}</Button>
+        <p className="text-xs text-muted-foreground">Checkout uses a database transaction and FEFO batch depletion. This confirmation is required because the current database checkout workflow records completed sales as paid.</p>
       </CardContent></Card>
     </div>
   </div>;
