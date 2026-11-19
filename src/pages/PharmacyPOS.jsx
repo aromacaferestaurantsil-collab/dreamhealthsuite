@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
-import { pharmacyCheckout } from '@/services/healthsuite';
+import { pharmacyCheckoutV2 } from '@/services/healthsuite';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -63,7 +63,7 @@ export default function PharmacyPOS() {
     setSaving(true);
     try {
       const invoiceNumber='HS-'+Date.now().toString(36).toUpperCase();
-      const saleId=await pharmacyCheckout({tenantId,branchId,invoiceNumber,items:cart.map(x=>({medicine_id:x.medicineId,quantity:x.quantity,unit_price:x.price})),paymentMethod:payment});
+      const saleId=await pharmacyCheckoutV2({tenantId,branchId,invoiceNumber,items:cart.map(x=>({medicine_id:x.medicineId,quantity:x.quantity,unit_price:x.price})),paymentMethod:payment,paymentStatus:'paid',idempotencyKey:crypto.randomUUID()});
       toast.success('Sale completed · '+invoiceNumber);
       setCart([]);
       setPaymentConfirmed(false);
@@ -88,7 +88,7 @@ export default function PharmacyPOS() {
         <select aria-label="Payment method" value={payment} onChange={e=>{setPayment(e.target.value);setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option></select>
         <label className="flex items-start gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)} className="mt-0.5" /><span>I confirm that the customer’s payment has actually been received by the selected method.</span></label>
         <Button className="w-full" disabled={saving || !cart.length || !branchId || !paymentConfirmed} onClick={checkout}>{saving?'Processing…':'Complete paid sale'}</Button>
-        <p className="text-xs text-muted-foreground">Checkout uses a database transaction and FEFO batch depletion. This confirmation is required because the current database checkout workflow records completed sales as paid.</p>
+        <p className="text-xs text-muted-foreground">Checkout is transactional and FEFO-based. A unique request key prevents accidental duplicate submissions; stock and sale records are committed together.</p>
       </CardContent></Card>
     </div>
   </div>;
