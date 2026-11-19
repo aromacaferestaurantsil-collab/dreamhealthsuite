@@ -1,16 +1,16 @@
 /**
- * sdk.js — the ONLY file in the app that touches an adapter.
- * Written by the platform at connect_database time. Do not edit.
+ * Temporary migration guard for screens not yet ported from the former hosted data SDK.
+ * This module deliberately has no dependency on Apper or any browser-injected global.
+ * Replace each caller with a tenant-scoped Supabase query, then delete this file.
  */
-const adapter = window.ApperSDK.ApperAdapter({
-  getClient: () => new window.ApperSDK.ApperClient({
-    apperProjectId: import.meta.env.VITE_APPER_PROJECT_ID,
-    apperPublicKey: import.meta.env.VITE_APPER_PUBLIC_KEY,
-  }),
-  ui: window.ApperSDK.ApperUI,
+const migrationError = () => new Error(
+  'This screen is being migrated to the HealthSuite database. Its former hosted data connector is disabled.'
+);
+
+export const sdk = Object.freeze({
+  table() {
+    throw migrationError();
+  },
 });
 
-export const sdk = await window.ApperSDK.CoreSDK.createClient(adapter);
-
-// Kept only for apps generated before 2026-09-28, whose AuthPage.jsx still imports it.
 export const demoAccounts = [];
