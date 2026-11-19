@@ -66,7 +66,7 @@ export default function PharmacyIntelligence() {
  const salesTotal=recentSales.reduce((n,x)=>n+Number(x.grand_total||0),0);
  const purchaseTotal=scopedOrders.filter(x=>new Date(x.order_date)>=cutoff).reduce((n,x)=>n+Number(x.total||0),0);
  const expenseTotal=scopedExpenses.filter(x=>new Date(x.expense_date)>=cutoff).reduce((n,x)=>n+Number(x.amount||0),0);
- const lineMap=useMemo(()=>{const m=new Map();for(const x of saleLines)m.set(x.medicine_id,(m.get(x.medicine_id)||0)+Number(x.quantity||0));return m},[saleLines]);
+ const lineMap=useMemo(()=>{const m=new Map();const ids=new Set(sales.filter(x=>x.branch_id===branch).map(x=>x.id));for(const x of saleLines)if(ids.has(x.sale_id))m.set(x.medicine_id,(m.get(x.medicine_id)||0)+Number(x.quantity||0));return m},[saleLines,sales,branch]);
  const recommendations=useMemo(()=>medicines.map(m=>{
   const stock=batches.filter(b=>b.branch_id===branch&&b.medicine_id===m.id&&b.expiry_date>=today).reduce((n,b)=>n+Number(b.quantity_on_hand||0),0);
   const annual=Number(lineMap.get(m.id)||0); const daily=annual/365; const target=Math.max(Number(m.reorder_level||0),Math.ceil(daily*45));
