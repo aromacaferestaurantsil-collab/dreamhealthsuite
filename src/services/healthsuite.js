@@ -66,3 +66,36 @@ export async function pharmacyCheckoutV2({tenantId,branchId,invoiceNumber,items,
  const {data,error}=await requireSupabase().rpc('pharmacy_checkout_v2',{p_tenant_id:tenantId,p_branch_id:branchId,p_invoice_number:invoiceNumber,p_items:items,p_payment_method:paymentMethod,p_payment_status:paymentStatus,p_idempotency_key:idempotencyKey,p_patient_id:patientId,p_prescription_reference:prescriptionReference});
  if(error) throw error; return data;
 }
+
+export async function pharmacyRecordExpensePayment({tenantId,expenseId,amount,paymentMethod,reference}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_record_expense_payment',{p_tenant_id:tenantId,p_expense_id:expenseId,p_amount:amount,p_payment_method:paymentMethod,p_reference:reference||null});
+ if(error) throw error; return data;
+}
+export async function pharmacyRecordSupplierPayment({tenantId,orderId,amount,paymentMethod,reference}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_record_supplier_payment',{p_tenant_id:tenantId,p_order_id:orderId,p_amount:amount,p_payment_method:paymentMethod,p_reference:reference||null});
+ if(error) throw error; return data;
+}
+export async function pharmacySubmitCustomerOrder({tenantId,branchId,orderNumber,items,prescriptionPath,notes}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_submit_customer_order',{p_tenant_id:tenantId,p_branch_id:branchId,p_order_number:orderNumber,p_items:items,p_prescription_path:prescriptionPath||null,p_notes:notes||null});
+ if(error) throw error; return data;
+}
+export async function pharmacyReviewCustomerOrder({tenantId,orderId,decision,notes,itemDecisions=[]}) {
+ const {error}=await requireSupabase().rpc('pharmacy_review_customer_order',{p_tenant_id:tenantId,p_order_id:orderId,p_decision:decision,p_notes:notes||null,p_item_decisions:itemDecisions});
+ if(error) throw error;
+}
+export async function pharmacyPlaceStockHold({tenantId,branchId,batchId,quantity,holdType,reason,reference}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_place_stock_hold',{p_tenant_id:tenantId,p_branch_id:branchId,p_batch_id:batchId,p_quantity:quantity,p_hold_type:holdType,p_reason:reason,p_reference:reference||null});
+ if(error) throw error; return data;
+}
+export async function pharmacyReleaseStockHold({tenantId,holdId,disposition='released'}) {
+ const {error}=await requireSupabase().rpc('pharmacy_release_stock_hold',{p_tenant_id:tenantId,p_hold_id:holdId,p_disposition:disposition});
+ if(error) throw error;
+}
+export async function pharmacyRecordControlledDrug({tenantId,branchId,medicineId,batchId,transactionType,quantityIn=0,quantityOut=0,patientId=null,prescriptionReference=null,notes=null}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_record_controlled_drug',{p_tenant_id:tenantId,p_branch_id:branchId,p_medicine_id:medicineId,p_batch_id:batchId||null,p_transaction_type:transactionType,p_quantity_in:quantityIn,p_quantity_out:quantityOut,p_patient_id:patientId,p_prescription_reference:prescriptionReference,p_notes:notes});
+ if(error) throw error; return data;
+}
+export async function pharmacyReviewCataloguePhoto({tenantId,suggestionId,decision,medicineId,notes}) {
+ const {error}=await requireSupabase().rpc('pharmacy_review_catalogue_photo',{p_tenant_id:tenantId,p_suggestion_id:suggestionId,p_decision:decision,p_medicine_id:medicineId||null,p_notes:notes||null});
+ if(error) throw error;
+}
