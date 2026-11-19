@@ -1,51 +1,54 @@
-# Local isolated database testing (free)
+# Browser-only schema reconstruction and later test plan
 
-This workflow does not create a Supabase cloud branch and does not modify the live project.
+This repository is being prepared without Docker Desktop, local database installation, paid Supabase branches, or new subscriptions.
 
-## Prerequisites
-- Docker Desktop installed and running.
-- Node.js LTS and npm.
-- Supabase CLI (recommended through the official installation instructions).
-- Git access to this repository.
+## Current working mode
 
-## Start an isolated local Supabase stack
-From the repository root:
+- The connected hosted Supabase database is inspected read-only.
+- No SQL migrations, DDL, test fixtures, or application writes are run against the hosted database.
+- GitHub is used to assemble and review the migration source.
+- The existing Apper application and hosted database remain untouched while the build is in progress.
 
-```bash
-npx supabase init
-npx supabase start
-npx supabase status
-```
+## Schema reconstruction
 
-If `supabase/config.toml` already exists, do not run init again. Keep the local stack separate from the hosted project. Do not run `supabase db push`, `supabase link`, `supabase db reset` against the production project.
+The hosted schema predates the tracked migration history. The live migration history currently contains six post-baseline migrations:
 
-## Schema reconstruction and replay
-The hosted database was created before a complete baseline migration was committed. The migration history currently contains the six later migrations only. Therefore:
-1. Run `supabase/local-test/catalog-inventory.sql` read-only in the hosted SQL editor and save its JSON result outside the repository.
-2. Reconstruct a baseline migration from the inventory, including tables, constraints, indexes, policies, functions, triggers, grants, extensions and default privileges.
-3. Apply the baseline only to the local stack.
-4. Replay the six tracked migrations in timestamp order.
-5. Compare local catalog inventory with the hosted inventory. Resolve differences before declaring parity.
+1. `20261114212450_transactional_module_workflows`
+2. `20261114212504_tenant_admin_audit_controls`
+3. `20261114212509_lab_pathologist_role_access`
+4. `20261114213109_restrict_rpc_access_and_protect_tenant_owner`
+5. `20261114213141_harden_rpc_and_lab_result_workflow`
+6. `20261114213435_expose_authenticated_tenant_bootstrap_rpc`
 
-Do not copy production rows or auth users into local. Use synthetic fixtures only.
+The repository currently has a filename/content mismatch for migration 4 (the hosted history lists it, but the expected file path is missing) and migration 6 is currently stored under a different timestamp. These must be reconciled against the actual hosted migration history before any replay is attempted.
 
-## Authenticated isolation tests
-Use two synthetic tenant owners, two branch-scoped staff users in separate branches, and one user with no membership. Create them through the local Supabase Auth API (never use real patient identities). Obtain normal user access tokens and exercise PostgREST using the `authenticated` role. Do not use the service-role key for authorization assertions: it bypasses RLS.
+The next engineering work is to reconstruct and document:
+- all 31 public tables, columns, defaults and nullability
+- primary, foreign, unique and check constraints
+- indexes
+- all RLS policies
+- functions, security modes and grants
+- triggers and trigger functions
+- schema/table/function privileges and required extensions
 
-Required assertions:
-- Tenant A cannot SELECT, INSERT, UPDATE or DELETE Tenant B rows.
-- Branch A staff cannot read or mutate Branch B rows within the same tenant.
-- A tenant-wide owner can access only their own tenant.
-- A user with no membership sees no tenant data and cannot create operational records.
-- Disabled module entitlement denies access even to an otherwise active member.
-- Role restrictions deny writes to unauthorized roles.
-- Lab result author cannot verify their own result; authorized independent pathologist can verify/release.
-- RPCs reject missing/invalid tenant, branch, role and status transitions.
+The baseline will be committed only after its DDL is complete and internally reviewed. A baseline assembled from partial catalog output must not be treated as a restore package.
 
-Record each assertion as PASS/FAIL with the SQL/API request and response. Do not claim a test passed unless it ran against a live authenticated session.
+## Testing boundary
+
+True isolated replay and authenticated cross-tenant tests require a separate database environment. They cannot be truthfully performed against production, and read-only catalog inspection is not a substitute for those tests.
+
+When a genuinely separate test environment becomes available within the agreed no-cost constraints, use synthetic identities only:
+- Tenant A owner and Tenant B owner
+- branch-scoped staff in separate branches
+- a user with no tenant membership
+
+Test tenant and branch SELECT/INSERT/UPDATE/DELETE isolation, module entitlements, role restrictions, lab independent verification, RPC authorization, appointment collision handling, stock depletion, and care-job transitions. Use normal authenticated user tokens for RLS assertions; service-role access bypasses RLS and is not valid evidence of user isolation.
+
+Record each executed assertion as PASS/FAIL with the request and response. Never label an unexecuted test as passed.
 
 ## Safety
-- Never place service-role keys, database passwords, access tokens or patient data in Git.
-- Keep `.env.local` ignored and use synthetic test data.
-- Do not drop/reset or migrate the hosted production database during this exercise.
-- The existing project has no application rows at the last recorded inspection, but that is not permission to reset it.
+
+- Never put service-role keys, database passwords, access tokens, auth exports or patient data in Git.
+- Never reset, delete, migrate, seed, or otherwise mutate the hosted production database during this preparation phase.
+- Do not create a paid branch or ask the user to install Docker, Supabase CLI, or other local tooling.
+- Production-readiness review and any production deployment are separate later approval steps.
