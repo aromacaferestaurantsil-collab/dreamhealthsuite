@@ -77,7 +77,7 @@ begin
  if not found or not private.has_module_access(p_tenant_id,'pharmacy_suite',o.branch_id,true) then raise exception 'Purchase order not found or access denied'; end if;
  select * into i from public.pharmacy_purchase_items where id=p_item_id and purchase_order_id=o.id and tenant_id=p_tenant_id for update;
  if not found then raise exception 'Purchase item not found'; end if;
- if o.status not in ('ordered','partially_received') then raise exception 'Order is not open for receiving'; end if;
+ if o.status not in ('ordered','part_received') then raise exception 'Order is not open for receiving'; end if;
  if p_quantity<=0 or p_quantity>(i.quantity_ordered-i.quantity_received) then raise exception 'Received quantity exceeds outstanding quantity'; end if;
  if p_expiry_date<current_date or p_batch_number is null or btrim(p_batch_number)='' then raise exception 'Valid batch number and non-expired expiry date are required'; end if;
  insert into public.medicine_batches(tenant_id,branch_id,medicine_id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_rate,mrp,selling_rate)
