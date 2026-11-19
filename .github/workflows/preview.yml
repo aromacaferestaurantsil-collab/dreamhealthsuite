@@ -23,7 +23,8 @@ jobs:
       - name: Build development PWA
         run: npm run build
         env:
-          GITHUB_PAGES: 'true'\n          VITE_SUPABASE_URL: https://klivmyonjuygukbfyymo.supabase.co
+          GITHUB_PAGES: 'true'
+          VITE_SUPABASE_URL: https://klivmyonjuygukbfyymo.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_fh0HTZUDTKGs5len51ELyw_G-9xXZFy
       - uses: actions/upload-pages-artifact@v3
         with:
