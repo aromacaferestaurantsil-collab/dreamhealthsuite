@@ -1,4 +1,7 @@
 -- PharmaSuite operational workflows. Apply only to an isolated/local database after the baseline has been reconstructed.
+alter table public.pharmacy_sales add column if not exists idempotency_key uuid;
+create unique index if not exists pharmacy_sales_tenant_idempotency_uidx on public.pharmacy_sales(tenant_id,idempotency_key) where idempotency_key is not null;
+
 create table if not exists public.pharmacy_returns (
  id uuid primary key default gen_random_uuid(),
  tenant_id uuid not null,
@@ -127,7 +130,7 @@ begin
   if not found then raise exception 'Batch not found'; end if;
   if v_batch.medicine_id<>(v_item->>'medicine_id')::uuid then raise exception 'Batch and medicine mismatch'; end if;
   if p_return_type='customer_return' then
-   select * into v_sale_item from public.pharmacy_sale_items si join public.pharmacy_sales s on s.id=si.sale_id where si.sale_id=p_sale_id and si.batch_id=v_batch.id and si.medicine_id=v_batch.medicine_id and s.tenant_id=p_tenant_id and s.branch_id=p_branch_id limit 1;
+   select si.* into v_sale_item from public.pharmacy_sale_items si join public.pharmacy_sales s on s.id=si.sale_id where si.sale_id=p_sale_id and si.batch_id=v_batch.id and si.medicine_id=v_batch.medicine_id and s.tenant_id=p_tenant_id and s.branch_id=p_branch_id limit 1;
    if not found or v_qty>(select coalesce(sum(quantity),0) from public.pharmacy_sale_items where sale_id=p_sale_id and batch_id=v_batch.id) then raise exception 'Return exceeds original sold quantity for batch'; end if;
    if coalesce(v_item->>'restock','true')='true' then
     update public.medicine_batches set quantity_on_hand=quantity_on_hand+v_qty where id=v_batch.id;
@@ -161,12 +164,11 @@ begin
  if p_payment_status not in ('paid','pending') then raise exception 'Invalid payment status'; end if;
  if p_payment_status='paid' and p_payment_method is null then raise exception 'Payment method required'; end if;
  if p_idempotency_key is null then raise exception 'Idempotency key required'; end if;
- select id into v_sale from public.pharmacy_sales where tenant_id=p_tenant_id and invoice_number=p_invoice_number;
+ select id into v_sale from public.pharmacy_sales where tenant_id=p_tenant_id and idempotency_key=p_idempotency_key;
  if v_sale is not null then return v_sale; end if;
- if exists(select 1 from public.pharmacy_sales where tenant_id=p_tenant_id and id::text=p_idempotency_key::text) then raise exception 'Duplicate checkout key'; end if;
  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'At least one item required'; end if;
- insert into public.pharmacy_sales(tenant_id,branch_id,patient_id,invoice_number,sale_status,payment_status,payment_method,prescription_reference,sold_by)
- values(p_tenant_id,p_branch_id,p_patient_id,p_invoice_number,'draft',p_payment_status,p_payment_method,p_prescription_reference,v_user) returning id into v_sale;
+ insert into public.pharmacy_sales(tenant_id,branch_id,patient_id,invoice_number,sale_status,payment_status,payment_method,prescription_reference,sold_by,idempotency_key)
+ values(p_tenant_id,p_branch_id,p_patient_id,p_invoice_number,'draft',p_payment_status,p_payment_method,p_prescription_reference,v_user,p_idempotency_key) returning id into v_sale;
  for v_item in select value from jsonb_array_elements(p_items) loop
   v_med:=(v_item->>'medicine_id')::uuid; v_qty:=(v_item->>'quantity')::numeric;
   if v_qty<=0 then raise exception 'Quantity must be positive'; end if;
