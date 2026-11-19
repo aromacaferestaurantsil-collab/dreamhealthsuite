@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+(function(){
+ var base='/dreamhealthsuite/';
+ var path=location.pathname.startsWith(base)?location.pathname.slice(base.length):'';
+ try{sessionStorage.setItem('healthbuddy-redirect',path+location.search+location.hash);}catch(e){}
+ location.replace(base);
+})();
+</script>
+<title>HealthBuddy 360</title>
+</head>
+<body><p>Opening HealthBuddy 360…</p></body>
+</html>
