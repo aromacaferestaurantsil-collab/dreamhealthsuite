@@ -21,10 +21,10 @@ The previous hosted data SDK has been removed from the HTML runtime and replaced
 
 ## Required migration gates
 1. Port all screens and data services away from the compatibility guard.
-2. Reconcile the existing hosted database migration history and reconstruct the full baseline.
+2. Recover the exact missing applied migration `20261114213109_restrict_rpc_access_and_protect_tenant_owner`; see `MIGRATION_HISTORY_RECONCILIATION.md`. Full clean-room replay remains blocked until its original SQL is recovered.
 3. Build and test against an isolated development database; do not mutate production during this phase.
 4. Add tenant/branch/role negative tests, auth lifecycle tests and workflow tests.
-5. Configure hosting, custom domain, backup/restore, payment providers and OAuth integrations with owner-controlled credentials.
+5. Configure hosting, backup/restore, payment providers and OAuth integrations with owner-controlled credentials. Custom-domain work is deferred until all builds are complete and final testing begins.
 6. Complete browser smoke tests and production deployment review before Android work.
 
 ## Current known backend tables
