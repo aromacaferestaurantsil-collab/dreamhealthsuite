@@ -26,17 +26,15 @@ Deno.serve(async (req) => {
       if (error || !license || license.status !== "active" || license.product_key !== body.product_key) return json({ error: "License is invalid or inactive" }, 403);
       const now = Date.now();
       if (new Date(license.valid_from).getTime() > now || (license.valid_until && new Date(license.valid_until).getTime() < now)) return json({ error: "License is outside its validity period" }, 403);
-      const { data: existing, error: existingError } = await admin.from("license_device_activations").select("id").eq("license_id", license.id).eq("device_fingerprint_hash", deviceHash).is("deactivated_at", null).maybeSingle();
-      if (existingError) throw existingError;
-      if (!existing) {
-        const { count, error: countError } = await admin.from("license_device_activations").select("id", { count: "exact", head: true }).eq("license_id", license.id).is("deactivated_at", null);
-        if (countError) throw countError;
-        if ((count || 0) >= license.max_devices) return json({ error: "Device activation limit reached" }, 409);
-        const { error: insertError } = await admin.from("license_device_activations").insert({ license_id: license.id, device_fingerprint_hash: deviceHash, device_label: body.device_label ?? null, platform: body.platform ?? null });
-        if (insertError) throw insertError;
-      } else {
-        const { error: touchError } = await admin.from("license_device_activations").update({ last_seen_at: new Date().toISOString() }).eq("id", existing.id);
-        if (touchError) throw touchError;
+      const { data: activationId, error: activationError } = await admin.rpc("activate_license_device", {
+        p_license_id: license.id,
+        p_device_fingerprint_hash: deviceHash,
+        p_device_label: body.device_label ?? null,
+        p_platform: body.platform ?? null
+      });
+      if (activationError) {
+        const status = activationError.message?.includes("limit reached") ? 409 : 403;
+        return json({ error: activationError.message }, status);
       }
       return json({ activated: true, tenant_id: license.tenant_id, product_key: license.product_key });
     }
