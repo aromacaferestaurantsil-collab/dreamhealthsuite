@@ -31,14 +31,14 @@ export async function requirePlatformAdmin(req: Request) {
   return ctx;
 }
 export async function audit(admin: any, actor: string, action: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
-  const { error } = await admin.from("audit_events").insert({
+  const { error } = await admin.from("platform_audit_events").insert({
     actor_user_id: actor, action, entity_type: entityType, entity_id: entityId,
     occurred_at: new Date().toISOString(), metadata
   });
   if (error) throw error;
 }
-export async function sha256(value: string) {
-  const bytes = new TextEncoder().encode(value);
+export async function sha256(value: string | Uint8Array) {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
 }
