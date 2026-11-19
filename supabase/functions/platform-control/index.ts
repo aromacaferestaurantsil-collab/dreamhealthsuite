@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
       if (!meta.product_key || !meta.platform || !meta.version || !meta.package_type) return json({ error: "Incomplete release metadata" }, 400);
       if (file.size < 1 || file.size > 1024 * 1024 * 1024) return json({ error: "Package must be between 1 byte and 1 GB" }, 413);
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const checksum = await sha256(String.fromCharCode(...bytes));
+      const checksum = await sha256(bytes);
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120);
       const path = `${meta.product_key}/${meta.platform}/${meta.version}/${crypto.randomUUID()}-${safeName}`;
       const { error: uploadError } = await admin.storage.from("release-packages").upload(path, bytes, { contentType: file.type || "application/octet-stream", upsert: false });
