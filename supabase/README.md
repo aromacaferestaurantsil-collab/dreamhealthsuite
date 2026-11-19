@@ -75,3 +75,11 @@ Never expose the Supabase service-role key to browser code.
 - The browser-only preparation plan now explicitly prohibits Docker, local tooling installation, paid branches, and hosted database mutations. Catalog reconstruction is read-only.
 - Pharmacy POS now requires the operator to check an explicit confirmation that payment was received before invoking the current checkout RPC. This is a UI safeguard only: the database RPC still records every successful checkout as paid, so a proper payment-state and reconciliation design remains a required engineering item before production use.
 - No successful frontend build or authenticated browser integration test has been observed for the recent changes. CI status has not reported a completed check for the latest commit.
+
+
+## Web/PWA-first delivery decision (2026-11-20)
+
+- Delivery order confirmed: complete the responsive web application and PWA feature set first; begin native Android app work only after the web/PWA features are complete and accepted.
+- Browser-based review is the interim validation path. Docker Desktop will be used later, after the feature build is complete, for local isolated database replay and authenticated integration testing.
+- No other project has been paused. FlatSync may be considered for a temporary pause only if a concrete capacity or dependency conflict arises; no project has been stopped or altered as part of this decision.
+- PharmaSuite catalogue, supplier register and branch-scoped batch inventory have now been migrated from Apper SDK calls to Supabase queries/inserts. Browser runtime validation remains pending.
