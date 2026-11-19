@@ -24,10 +24,11 @@ All 31 tables were observed with RLS enabled at the time of this inventory. The 
 1. `20261114212450_transactional_module_workflows.sql`
 2. `20261114212504_tenant_admin_audit_controls.sql`
 3. `20261114212509_lab_pathologist_role_access.sql`
-4. `20261114213109_restrict_rpc_access_and_protect_tenant_owner.sql`
+4. `20261114213109_restrict_rpc_access_and_protect_tenant_owner.sql` (listed in hosted migration history; expected repository file currently returns not found)
 5. `20261114213141_harden_rpc_and_lab_result_workflow.sql`
+6. Hosted migration history records `20261114213435_expose_authenticated_tenant_bootstrap_rpc`; repository currently stores the corresponding SQL as `20261115110000_expose_authenticated_tenant_bootstrap_rpc.sql`.
 
-The first three were copied from the database migration history. The last two harden RPC grants, tenant owner protection, and the lab-result workflow.
+The migration filenames and versions are not yet aligned. Reconcile the missing fourth file and bootstrap timestamp with the authoritative migration SQL before replay. Do not rename or reapply migrations against the hosted database.
 
 ## Important baseline limitation
 The original table/schema foundation predates the versioned migration history currently visible in Supabase. Catalog inspection has confirmed the current 31-table structure, columns, constraints, indexes, policies, triggers, and functions, but the full DDL has not yet been assembled into an ordered, replay-tested baseline migration. Therefore this folder is **not yet a complete blank-database rebuild package**. Do not reset or recreate the production database from these migrations alone.
@@ -64,5 +65,13 @@ Never expose the Supabase service-role key to browser code.
 - Updated `RootLayout` to route authenticated users with no active membership to `/workspace/new`, and route existing members away from that page.
 - This is code-level implementation only. Signup confirmation, owner bootstrap, membership refresh, duplicate-slug handling and multi-tenant switching still require browser tests with real test accounts.
 - The current Supabase migration history contains six post-baseline migrations only. It still does **not** recreate the original 31-table schema from an empty database. Do not reset the live project or use this repository as a blank-database restore until the foundational schema, policies, indexes, triggers and grants have been reconstructed and replay-tested.
-- The Supabase security advisor currently reports two warnings for authenticated execution of SECURITY DEFINER RPCs: `public.create_tenant_with_owner` and `public.lab_verify_result`. These are intended privileged workflows but need a formal permission review and negative tests. Health advisor currently reports no lints.
+- The Supabase security advisor previously reported warnings for authenticated execution of SECURITY DEFINER RPCs, including `public.create_tenant_with_owner` and `public.lab_verify_result`. These privileged workflows still need formal permission review and negative tests.
+- Catalog inspection confirms the `public` schema grants USAGE to `anon`, `authenticated`, and `service_role`; this alone does not establish table access safety. Effective table privileges, RLS policies, and function execution grants must be reviewed together. The broad default-looking table grant entries require a focused ACL check before production approval.
 - No authenticated tenant/branch isolation tests, clinical module workflow tests, or successful frontend build have yet been recorded.
+
+
+## Current engineering work (2026-11-20)
+
+- The browser-only preparation plan now explicitly prohibits Docker, local tooling installation, paid branches, and hosted database mutations. Catalog reconstruction is read-only.
+- Pharmacy POS now requires the operator to check an explicit confirmation that payment was received before invoking the current checkout RPC. This is a UI safeguard only: the database RPC still records every successful checkout as paid, so a proper payment-state and reconciliation design remains a required engineering item before production use.
+- No successful frontend build or authenticated browser integration test has been observed for the recent changes. CI status has not reported a completed check for the latest commit.
