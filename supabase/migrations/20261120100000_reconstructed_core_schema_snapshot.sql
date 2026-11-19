@@ -7,7 +7,6 @@ revoke all on schema private from public, anon;
 grant usage on schema private to authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 
-
 create table public."audit_events" (
   "id" uuid default gen_random_uuid() not null,
   "tenant_id" uuid not null,
@@ -448,185 +447,181 @@ create table public."user_profiles" (
   "updated_at" timestamp with time zone default now() not null
 );
 
-alter table public."audit_events" add constraint "audit_events_actor_user_id_fkey" FOREIGN KEY (actor_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
-
 alter table public."audit_events" add constraint "audit_events_pkey" PRIMARY KEY (id);
-
-alter table public."audit_events" add constraint "audit_events_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
-
-alter table public."audit_events" add constraint "audit_events_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 
 alter table public."billing_invoices" add constraint "billing_invoices_pkey" PRIMARY KEY (id);
 
-alter table public."billing_invoices" add constraint "billing_invoices_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'issued'::text, 'paid'::text, 'part_paid'::text, 'void'::text, 'overdue'::text])));
+alter table public."billing_payments" add constraint "billing_payments_pkey" PRIMARY KEY (id);
 
-alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+alter table public."branches" add constraint "branches_pkey" PRIMARY KEY (id);
+
+alter table public."care_job_events" add constraint "care_job_events_pkey" PRIMARY KEY (id);
+
+alter table public."care_jobs" add constraint "care_jobs_pkey" PRIMARY KEY (id);
+
+alter table public."care_service_catalogue" add constraint "care_service_catalogue_pkey" PRIMARY KEY (id);
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_pkey" PRIMARY KEY (id);
+
+alter table public."doctor_consultations" add constraint "doctor_consultations_pkey" PRIMARY KEY (id);
+
+alter table public."doctor_profiles" add constraint "doctor_profiles_pkey" PRIMARY KEY (id);
+
+alter table public."lab_booking_items" add constraint "lab_booking_items_pkey" PRIMARY KEY (id);
+
+alter table public."lab_bookings" add constraint "lab_bookings_pkey" PRIMARY KEY (id);
+
+alter table public."lab_results" add constraint "lab_results_pkey" PRIMARY KEY (id);
+
+alter table public."lab_samples" add constraint "lab_samples_pkey" PRIMARY KEY (id);
+
+alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_pkey" PRIMARY KEY (id);
+
+alter table public."medicine_batches" add constraint "medicine_batches_pkey" PRIMARY KEY (id);
+
+alter table public."medicine_catalogue" add constraint "medicine_catalogue_pkey" PRIMARY KEY (id);
+
+alter table public."patient_consents" add constraint "patient_consents_pkey" PRIMARY KEY (id);
+
+alter table public."patients" add constraint "patients_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_sales" add constraint "pharmacy_sales_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_pkey" PRIMARY KEY (id);
+
+alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_pkey" PRIMARY KEY (id);
+
+alter table public."subscription_plans" add constraint "subscription_plans_pkey" PRIMARY KEY (id);
+
+alter table public."tenant_memberships" add constraint "tenant_memberships_pkey" PRIMARY KEY (id);
+
+alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_pkey" PRIMARY KEY (id);
+
+alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_pkey" PRIMARY KEY (id);
+
+alter table public."tenants" add constraint "tenants_pkey" PRIMARY KEY (id);
+
+alter table public."user_profiles" add constraint "user_profiles_pkey" PRIMARY KEY (user_id);
 
 alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_id_key" UNIQUE (tenant_id, id);
 
 alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_invoice_number_key" UNIQUE (tenant_id, invoice_number);
 
-alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_subscription_id_fkey" FOREIGN KEY (tenant_id, subscription_id) REFERENCES tenant_subscriptions(tenant_id, id);
-
-alter table public."billing_payments" add constraint "billing_payments_amount_check" CHECK ((amount > (0)::numeric));
-
-alter table public."billing_payments" add constraint "billing_payments_payment_status_check" CHECK ((payment_status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text])));
-
-alter table public."billing_payments" add constraint "billing_payments_pkey" PRIMARY KEY (id);
-
-alter table public."billing_payments" add constraint "billing_payments_tenant_id_invoice_id_fkey" FOREIGN KEY (tenant_id, invoice_id) REFERENCES billing_invoices(tenant_id, id);
-
-alter table public."branches" add constraint "branches_pkey" PRIMARY KEY (id);
-
-alter table public."branches" add constraint "branches_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
-
 alter table public."branches" add constraint "branches_tenant_id_branch_code_key" UNIQUE (tenant_id, branch_code);
 
-alter table public."branches" add constraint "branches_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
 alter table public."branches" add constraint "branches_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."care_job_events" add constraint "care_job_events_actor_user_id_fkey" FOREIGN KEY (actor_user_id) REFERENCES auth.users(id);
-
-alter table public."care_job_events" add constraint "care_job_events_pkey" PRIMARY KEY (id);
-
-alter table public."care_job_events" add constraint "care_job_events_tenant_id_job_id_fkey" FOREIGN KEY (tenant_id, job_id) REFERENCES care_jobs(tenant_id, id) ON DELETE CASCADE;
-
-alter table public."care_jobs" add constraint "care_jobs_assigned_to_fkey" FOREIGN KEY (assigned_to) REFERENCES auth.users(id);
-
-alter table public."care_jobs" add constraint "care_jobs_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
-alter table public."care_jobs" add constraint "care_jobs_job_status_check" CHECK ((job_status = ANY (ARRAY['requested'::text, 'approved'::text, 'assigned'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])));
-
-alter table public."care_jobs" add constraint "care_jobs_pkey" PRIMARY KEY (id);
-
-alter table public."care_jobs" add constraint "care_jobs_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
 
 alter table public."care_jobs" add constraint "care_jobs_tenant_id_id_key" UNIQUE (tenant_id, id);
 
 alter table public."care_jobs" add constraint "care_jobs_tenant_id_job_number_key" UNIQUE (tenant_id, job_number);
 
-alter table public."care_jobs" add constraint "care_jobs_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
-
-alter table public."care_jobs" add constraint "care_jobs_tenant_id_service_id_fkey" FOREIGN KEY (tenant_id, service_id) REFERENCES care_service_catalogue(tenant_id, id);
-
-alter table public."care_service_catalogue" add constraint "care_service_catalogue_pkey" PRIMARY KEY (id);
-
-alter table public."care_service_catalogue" add constraint "care_service_catalogue_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
-
-alter table public."care_service_catalogue" add constraint "care_service_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
 alter table public."care_service_catalogue" add constraint "care_service_catalogue_tenant_id_id_key" UNIQUE (tenant_id, id);
 
 alter table public."care_service_catalogue" add constraint "care_service_catalogue_tenant_id_service_code_key" UNIQUE (tenant_id, service_code);
 
-alter table public."doctor_appointments" add constraint "doctor_appointments_appointment_status_check" CHECK ((appointment_status = ANY (ARRAY['scheduled'::text, 'checked_in'::text, 'in_consultation'::text, 'completed'::text, 'cancelled'::text, 'no_show'::text])));
-
-alter table public."doctor_appointments" add constraint "doctor_appointments_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
-alter table public."doctor_appointments" add constraint "doctor_appointments_pkey" PRIMARY KEY (id);
-
 alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_appointment_number_key" UNIQUE (tenant_id, appointment_number);
-
-alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
-
-alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_doctor_id_fkey" FOREIGN KEY (tenant_id, doctor_id) REFERENCES doctor_profiles(tenant_id, id);
 
 alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_id_key" UNIQUE (tenant_id, id);
 
-alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
-
-alter table public."doctor_consultations" add constraint "doctor_consultations_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
-alter table public."doctor_consultations" add constraint "doctor_consultations_pkey" PRIMARY KEY (id);
-
-alter table public."doctor_consultations" add constraint "doctor_consultations_signed_by_fkey" FOREIGN KEY (signed_by) REFERENCES auth.users(id);
-
-alter table public."doctor_consultations" add constraint "doctor_consultations_tenant_id_appointment_id_fkey" FOREIGN KEY (tenant_id, appointment_id) REFERENCES doctor_appointments(tenant_id, id);
-
 alter table public."doctor_consultations" add constraint "doctor_consultations_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."doctor_profiles" add constraint "doctor_profiles_pkey" PRIMARY KEY (id);
-
-alter table public."doctor_profiles" add constraint "doctor_profiles_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
 
 alter table public."doctor_profiles" add constraint "doctor_profiles_tenant_id_doctor_code_key" UNIQUE (tenant_id, doctor_code);
 
-alter table public."doctor_profiles" add constraint "doctor_profiles_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
 alter table public."doctor_profiles" add constraint "doctor_profiles_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."doctor_profiles" add constraint "doctor_profiles_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id);
-
-alter table public."lab_booking_items" add constraint "lab_booking_items_item_status_check" CHECK ((item_status = ANY (ARRAY['pending'::text, 'collected'::text, 'processing'::text, 'completed'::text, 'cancelled'::text])));
-
-alter table public."lab_booking_items" add constraint "lab_booking_items_pkey" PRIMARY KEY (id);
-
-alter table public."lab_booking_items" add constraint "lab_booking_items_price_check" CHECK ((price >= (0)::numeric));
-
-alter table public."lab_booking_items" add constraint "lab_booking_items_tenant_id_booking_id_fkey" FOREIGN KEY (tenant_id, booking_id) REFERENCES lab_bookings(tenant_id, id) ON DELETE CASCADE;
 
 alter table public."lab_booking_items" add constraint "lab_booking_items_tenant_id_id_key" UNIQUE (tenant_id, id);
 
-alter table public."lab_booking_items" add constraint "lab_booking_items_tenant_id_test_id_fkey" FOREIGN KEY (tenant_id, test_id) REFERENCES lab_test_catalogue(tenant_id, id);
-
-alter table public."lab_bookings" add constraint "lab_bookings_booking_status_check" CHECK ((booking_status = ANY (ARRAY['booked'::text, 'collected'::text, 'processing'::text, 'completed'::text, 'cancelled'::text])));
-
-alter table public."lab_bookings" add constraint "lab_bookings_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
-alter table public."lab_bookings" add constraint "lab_bookings_payment_status_check" CHECK ((payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'partial'::text, 'refunded'::text])));
-
-alter table public."lab_bookings" add constraint "lab_bookings_pkey" PRIMARY KEY (id);
-
 alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_booking_number_key" UNIQUE (tenant_id, booking_number);
-
-alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
 
 alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_id_key" UNIQUE (tenant_id, id);
 
-alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
-
-alter table public."lab_results" add constraint "lab_results_entered_by_fkey" FOREIGN KEY (entered_by) REFERENCES auth.users(id);
-
-alter table public."lab_results" add constraint "lab_results_pkey" PRIMARY KEY (id);
-
-alter table public."lab_results" add constraint "lab_results_result_status_check" CHECK ((result_status = ANY (ARRAY['draft'::text, 'entered'::text, 'verified'::text, 'released'::text, 'amended'::text])));
-
-alter table public."lab_results" add constraint "lab_results_tenant_id_booking_item_id_fkey" FOREIGN KEY (tenant_id, booking_item_id) REFERENCES lab_booking_items(tenant_id, id);
-
 alter table public."lab_results" add constraint "lab_results_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."lab_results" add constraint "lab_results_verified_by_fkey" FOREIGN KEY (verified_by) REFERENCES auth.users(id);
-
-alter table public."lab_samples" add constraint "lab_samples_collected_by_fkey" FOREIGN KEY (collected_by) REFERENCES auth.users(id);
-
-alter table public."lab_samples" add constraint "lab_samples_pkey" PRIMARY KEY (id);
-
-alter table public."lab_samples" add constraint "lab_samples_sample_status_check" CHECK ((sample_status = ANY (ARRAY['pending'::text, 'collected'::text, 'received'::text, 'rejected'::text, 'processed'::text])));
-
-alter table public."lab_samples" add constraint "lab_samples_tenant_id_booking_item_id_fkey" FOREIGN KEY (tenant_id, booking_item_id) REFERENCES lab_booking_items(tenant_id, id) ON DELETE CASCADE;
 
 alter table public."lab_samples" add constraint "lab_samples_tenant_id_id_key" UNIQUE (tenant_id, id);
 
 alter table public."lab_samples" add constraint "lab_samples_tenant_id_sample_code_key" UNIQUE (tenant_id, sample_code);
 
-alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_pkey" PRIMARY KEY (id);
+alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_test_code_key" UNIQUE (tenant_id, test_code);
+
+alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_branch_id_medicine_id_batch_numb_key" UNIQUE (tenant_id, branch_id, medicine_id, batch_number);
+
+alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_sku_key" UNIQUE (tenant_id, sku);
+
+alter table public."patients" add constraint "patients_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."patients" add constraint "patients_tenant_id_patient_code_key" UNIQUE (tenant_id, patient_code);
+
+alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_order_number_key" UNIQUE (tenant_id, order_number);
+
+alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_invoice_number_key" UNIQUE (tenant_id, invoice_number);
+
+alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."subscription_plans" add constraint "subscription_plans_plan_code_key" UNIQUE (plan_code);
+
+alter table public."tenant_memberships" add constraint "tenant_memberships_tenant_id_user_id_key" UNIQUE (tenant_id, user_id);
+
+alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_tenant_id_module_key_key" UNIQUE (tenant_id, module_key);
+
+alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_tenant_id_id_key" UNIQUE (tenant_id, id);
+
+alter table public."tenants" add constraint "tenants_slug_key" UNIQUE (slug);
+
+alter table public."billing_invoices" add constraint "billing_invoices_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'issued'::text, 'paid'::text, 'part_paid'::text, 'void'::text, 'overdue'::text])));
+
+alter table public."billing_payments" add constraint "billing_payments_amount_check" CHECK ((amount > (0)::numeric));
+
+alter table public."billing_payments" add constraint "billing_payments_payment_status_check" CHECK ((payment_status = ANY (ARRAY['pending'::text, 'succeeded'::text, 'failed'::text, 'refunded'::text])));
+
+alter table public."branches" add constraint "branches_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
+
+alter table public."care_jobs" add constraint "care_jobs_job_status_check" CHECK ((job_status = ANY (ARRAY['requested'::text, 'approved'::text, 'assigned'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])));
+
+alter table public."care_service_catalogue" add constraint "care_service_catalogue_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_appointment_status_check" CHECK ((appointment_status = ANY (ARRAY['scheduled'::text, 'checked_in'::text, 'in_consultation'::text, 'completed'::text, 'cancelled'::text, 'no_show'::text])));
+
+alter table public."doctor_profiles" add constraint "doctor_profiles_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
+
+alter table public."lab_booking_items" add constraint "lab_booking_items_item_status_check" CHECK ((item_status = ANY (ARRAY['pending'::text, 'collected'::text, 'processing'::text, 'completed'::text, 'cancelled'::text])));
+
+alter table public."lab_booking_items" add constraint "lab_booking_items_price_check" CHECK ((price >= (0)::numeric));
+
+alter table public."lab_bookings" add constraint "lab_bookings_booking_status_check" CHECK ((booking_status = ANY (ARRAY['booked'::text, 'collected'::text, 'processing'::text, 'completed'::text, 'cancelled'::text])));
+
+alter table public."lab_bookings" add constraint "lab_bookings_payment_status_check" CHECK ((payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'partial'::text, 'refunded'::text])));
+
+alter table public."lab_results" add constraint "lab_results_result_status_check" CHECK ((result_status = ANY (ARRAY['draft'::text, 'entered'::text, 'verified'::text, 'released'::text, 'amended'::text])));
+
+alter table public."lab_samples" add constraint "lab_samples_sample_status_check" CHECK ((sample_status = ANY (ARRAY['pending'::text, 'collected'::text, 'received'::text, 'rejected'::text, 'processed'::text])));
 
 alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_price_check" CHECK ((price >= (0)::numeric));
 
 alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
 
-alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
-alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_test_code_key" UNIQUE (tenant_id, test_code);
-
 alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_turnaround_hours_check" CHECK ((turnaround_hours >= 0));
 
 alter table public."medicine_batches" add constraint "medicine_batches_mrp_check" CHECK ((mrp >= (0)::numeric));
-
-alter table public."medicine_batches" add constraint "medicine_batches_pkey" PRIMARY KEY (id);
 
 alter table public."medicine_batches" add constraint "medicine_batches_purchase_rate_check" CHECK ((purchase_rate >= (0)::numeric));
 
@@ -634,55 +629,15 @@ alter table public."medicine_batches" add constraint "medicine_batches_quantity_
 
 alter table public."medicine_batches" add constraint "medicine_batches_selling_rate_check" CHECK ((selling_rate >= (0)::numeric));
 
-alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
-
-alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_branch_id_medicine_id_batch_numb_key" UNIQUE (tenant_id, branch_id, medicine_id, batch_number);
-
-alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
-
-alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_supplier_id_fkey" FOREIGN KEY (tenant_id, supplier_id) REFERENCES pharmacy_suppliers(tenant_id, id);
-
 alter table public."medicine_catalogue" add constraint "medicine_catalogue_gst_rate_check" CHECK (((gst_rate >= (0)::numeric) AND (gst_rate <= (100)::numeric)));
-
-alter table public."medicine_catalogue" add constraint "medicine_catalogue_pkey" PRIMARY KEY (id);
 
 alter table public."medicine_catalogue" add constraint "medicine_catalogue_reorder_level_check" CHECK ((reorder_level >= (0)::numeric));
 
 alter table public."medicine_catalogue" add constraint "medicine_catalogue_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
 
-alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
-alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_sku_key" UNIQUE (tenant_id, sku);
-
-alter table public."patient_consents" add constraint "patient_consents_captured_by_fkey" FOREIGN KEY (captured_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public."patient_consents" add constraint "patient_consents_pkey" PRIMARY KEY (id);
-
-alter table public."patient_consents" add constraint "patient_consents_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
-alter table public."patient_consents" add constraint "patient_consents_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
-
-alter table public."patients" add constraint "patients_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
 alter table public."patients" add constraint "patients_gender_check" CHECK ((gender = ANY (ARRAY['female'::text, 'male'::text, 'other'::text, 'unknown'::text])));
 
-alter table public."patients" add constraint "patients_pkey" PRIMARY KEY (id);
-
 alter table public."patients" add constraint "patients_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'merged'::text])));
-
-alter table public."patients" add constraint "patients_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
-
-alter table public."patients" add constraint "patients_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
-alter table public."patients" add constraint "patients_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."patients" add constraint "patients_tenant_id_patient_code_key" UNIQUE (tenant_id, patient_code);
-
-alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_pkey" PRIMARY KEY (id);
 
 alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_quantity_ordered_check" CHECK ((quantity_ordered > (0)::numeric));
 
@@ -690,41 +645,13 @@ alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_i
 
 alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tax_rate_check" CHECK (((tax_rate >= (0)::numeric) AND (tax_rate <= (100)::numeric)));
 
-alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
-
-alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_purchase_order_id_fkey" FOREIGN KEY (tenant_id, purchase_order_id) REFERENCES pharmacy_purchase_orders(tenant_id, id) ON DELETE CASCADE;
-
 alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_unit_cost_check" CHECK ((unit_cost >= (0)::numeric));
 
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
-
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_pkey" PRIMARY KEY (id);
-
 alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'ordered'::text, 'part_received'::text, 'received'::text, 'cancelled'::text])));
-
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
-
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_order_number_key" UNIQUE (tenant_id, order_number);
-
-alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_supplier_id_fkey" FOREIGN KEY (tenant_id, supplier_id) REFERENCES pharmacy_suppliers(tenant_id, id);
-
-alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_pkey" PRIMARY KEY (id);
 
 alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_quantity_check" CHECK ((quantity > (0)::numeric));
 
 alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tax_rate_check" CHECK (((tax_rate >= (0)::numeric) AND (tax_rate <= (100)::numeric)));
-
-alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_batch_id_fkey" FOREIGN KEY (tenant_id, batch_id) REFERENCES medicine_batches(tenant_id, id);
-
-alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
-
-alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_sale_id_fkey" FOREIGN KEY (tenant_id, sale_id) REFERENCES pharmacy_sales(tenant_id, id) ON DELETE CASCADE;
 
 alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_unit_price_check" CHECK ((unit_price >= (0)::numeric));
 
@@ -732,27 +659,141 @@ alter table public."pharmacy_sales" add constraint "pharmacy_sales_payment_metho
 
 alter table public."pharmacy_sales" add constraint "pharmacy_sales_payment_status_check" CHECK ((payment_status = ANY (ARRAY['pending'::text, 'paid'::text, 'partial'::text, 'refunded'::text])));
 
-alter table public."pharmacy_sales" add constraint "pharmacy_sales_pkey" PRIMARY KEY (id);
-
 alter table public."pharmacy_sales" add constraint "pharmacy_sales_sale_status_check" CHECK ((sale_status = ANY (ARRAY['draft'::text, 'completed'::text, 'void'::text, 'refunded'::text])));
+
+alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_movement_type_check" CHECK ((movement_type = ANY (ARRAY['opening'::text, 'purchase'::text, 'sale'::text, 'sale_return'::text, 'purchase_return'::text, 'adjustment'::text, 'transfer_in'::text, 'transfer_out'::text, 'expiry'::text, 'damage'::text])));
+
+alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_quantity_delta_check" CHECK ((quantity_delta <> (0)::numeric));
+
+alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
+
+alter table public."subscription_plans" add constraint "subscription_plans_billing_interval_check" CHECK ((billing_interval = ANY (ARRAY['monthly'::text, 'annual'::text])));
+
+alter table public."subscription_plans" add constraint "subscription_plans_price_check" CHECK ((price >= (0)::numeric));
+
+alter table public."tenant_memberships" add constraint "tenant_memberships_role_check" CHECK ((role = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text, 'doctor'::text, 'pharmacist'::text, 'lab_technician'::text, 'pathologist'::text, 'care_worker'::text, 'receptionist'::text, 'analyst'::text, 'staff'::text])));
+
+alter table public."tenant_memberships" add constraint "tenant_memberships_status_check" CHECK ((status = ANY (ARRAY['invited'::text, 'active'::text, 'suspended'::text, 'removed'::text])));
+
+alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_module_key_check" CHECK ((module_key = ANY (ARRAY['patient_suite'::text, 'pharmacy_suite'::text, 'laboratory_suite'::text, 'doctor_suite'::text, 'care_connect'::text, 'analytics'::text])));
+
+alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_status_check" CHECK ((status = ANY (ARRAY['trial'::text, 'active'::text, 'past_due'::text, 'cancelled'::text, 'expired'::text, 'suspended'::text])));
+
+alter table public."tenants" add constraint "tenants_status_check" CHECK ((status = ANY (ARRAY['trial'::text, 'active'::text, 'suspended'::text, 'closed'::text])));
+
+alter table public."audit_events" add constraint "audit_events_actor_user_id_fkey" FOREIGN KEY (actor_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public."audit_events" add constraint "audit_events_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."audit_events" add constraint "audit_events_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."billing_invoices" add constraint "billing_invoices_tenant_id_subscription_id_fkey" FOREIGN KEY (tenant_id, subscription_id) REFERENCES tenant_subscriptions(tenant_id, id);
+
+alter table public."billing_payments" add constraint "billing_payments_tenant_id_invoice_id_fkey" FOREIGN KEY (tenant_id, invoice_id) REFERENCES billing_invoices(tenant_id, id);
+
+alter table public."branches" add constraint "branches_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."care_job_events" add constraint "care_job_events_actor_user_id_fkey" FOREIGN KEY (actor_user_id) REFERENCES auth.users(id);
+
+alter table public."care_job_events" add constraint "care_job_events_tenant_id_job_id_fkey" FOREIGN KEY (tenant_id, job_id) REFERENCES care_jobs(tenant_id, id) ON DELETE CASCADE;
+
+alter table public."care_jobs" add constraint "care_jobs_assigned_to_fkey" FOREIGN KEY (assigned_to) REFERENCES auth.users(id);
+
+alter table public."care_jobs" add constraint "care_jobs_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+alter table public."care_jobs" add constraint "care_jobs_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."care_jobs" add constraint "care_jobs_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
+
+alter table public."care_jobs" add constraint "care_jobs_tenant_id_service_id_fkey" FOREIGN KEY (tenant_id, service_id) REFERENCES care_service_catalogue(tenant_id, id);
+
+alter table public."care_service_catalogue" add constraint "care_service_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_doctor_id_fkey" FOREIGN KEY (tenant_id, doctor_id) REFERENCES doctor_profiles(tenant_id, id);
+
+alter table public."doctor_appointments" add constraint "doctor_appointments_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
+
+alter table public."doctor_consultations" add constraint "doctor_consultations_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+alter table public."doctor_consultations" add constraint "doctor_consultations_signed_by_fkey" FOREIGN KEY (signed_by) REFERENCES auth.users(id);
+
+alter table public."doctor_consultations" add constraint "doctor_consultations_tenant_id_appointment_id_fkey" FOREIGN KEY (tenant_id, appointment_id) REFERENCES doctor_appointments(tenant_id, id);
+
+alter table public."doctor_profiles" add constraint "doctor_profiles_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."doctor_profiles" add constraint "doctor_profiles_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id);
+
+alter table public."lab_booking_items" add constraint "lab_booking_items_tenant_id_booking_id_fkey" FOREIGN KEY (tenant_id, booking_id) REFERENCES lab_bookings(tenant_id, id) ON DELETE CASCADE;
+
+alter table public."lab_booking_items" add constraint "lab_booking_items_tenant_id_test_id_fkey" FOREIGN KEY (tenant_id, test_id) REFERENCES lab_test_catalogue(tenant_id, id);
+
+alter table public."lab_bookings" add constraint "lab_bookings_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."lab_bookings" add constraint "lab_bookings_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
+
+alter table public."lab_results" add constraint "lab_results_entered_by_fkey" FOREIGN KEY (entered_by) REFERENCES auth.users(id);
+
+alter table public."lab_results" add constraint "lab_results_tenant_id_booking_item_id_fkey" FOREIGN KEY (tenant_id, booking_item_id) REFERENCES lab_booking_items(tenant_id, id);
+
+alter table public."lab_results" add constraint "lab_results_verified_by_fkey" FOREIGN KEY (verified_by) REFERENCES auth.users(id);
+
+alter table public."lab_samples" add constraint "lab_samples_collected_by_fkey" FOREIGN KEY (collected_by) REFERENCES auth.users(id);
+
+alter table public."lab_samples" add constraint "lab_samples_tenant_id_booking_item_id_fkey" FOREIGN KEY (tenant_id, booking_item_id) REFERENCES lab_booking_items(tenant_id, id) ON DELETE CASCADE;
+
+alter table public."lab_test_catalogue" add constraint "lab_test_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
+
+alter table public."medicine_batches" add constraint "medicine_batches_tenant_id_supplier_id_fkey" FOREIGN KEY (tenant_id, supplier_id) REFERENCES pharmacy_suppliers(tenant_id, id);
+
+alter table public."medicine_catalogue" add constraint "medicine_catalogue_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."patient_consents" add constraint "patient_consents_captured_by_fkey" FOREIGN KEY (captured_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public."patient_consents" add constraint "patient_consents_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."patient_consents" add constraint "patient_consents_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
+
+alter table public."patients" add constraint "patients_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+alter table public."patients" add constraint "patients_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."patients" add constraint "patients_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
+
+alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
+
+alter table public."pharmacy_purchase_items" add constraint "pharmacy_purchase_items_tenant_id_purchase_order_id_fkey" FOREIGN KEY (tenant_id, purchase_order_id) REFERENCES pharmacy_purchase_orders(tenant_id, id) ON DELETE CASCADE;
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_created_by_fkey" FOREIGN KEY (created_by) REFERENCES auth.users(id);
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
+
+alter table public."pharmacy_purchase_orders" add constraint "pharmacy_purchase_orders_tenant_id_supplier_id_fkey" FOREIGN KEY (tenant_id, supplier_id) REFERENCES pharmacy_suppliers(tenant_id, id);
+
+alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_batch_id_fkey" FOREIGN KEY (tenant_id, batch_id) REFERENCES medicine_batches(tenant_id, id);
+
+alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
+
+alter table public."pharmacy_sale_items" add constraint "pharmacy_sale_items_tenant_id_sale_id_fkey" FOREIGN KEY (tenant_id, sale_id) REFERENCES pharmacy_sales(tenant_id, id) ON DELETE CASCADE;
 
 alter table public."pharmacy_sales" add constraint "pharmacy_sales_sold_by_fkey" FOREIGN KEY (sold_by) REFERENCES auth.users(id);
 
 alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
 
-alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_invoice_number_key" UNIQUE (tenant_id, invoice_number);
-
 alter table public."pharmacy_sales" add constraint "pharmacy_sales_tenant_id_patient_id_fkey" FOREIGN KEY (tenant_id, patient_id) REFERENCES patients(tenant_id, id);
 
 alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_actor_user_id_fkey" FOREIGN KEY (actor_user_id) REFERENCES auth.users(id);
-
-alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_movement_type_check" CHECK ((movement_type = ANY (ARRAY['opening'::text, 'purchase'::text, 'sale'::text, 'sale_return'::text, 'purchase_return'::text, 'adjustment'::text, 'transfer_in'::text, 'transfer_out'::text, 'expiry'::text, 'damage'::text])));
-
-alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_pkey" PRIMARY KEY (id);
-
-alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_quantity_delta_check" CHECK ((quantity_delta <> (0)::numeric));
 
 alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_tenant_id_batch_id_fkey" FOREIGN KEY (tenant_id, batch_id) REFERENCES medicine_batches(tenant_id, id);
 
@@ -760,63 +801,21 @@ alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_mov
 
 alter table public."pharmacy_stock_movements" add constraint "pharmacy_stock_movements_tenant_id_medicine_id_fkey" FOREIGN KEY (tenant_id, medicine_id) REFERENCES medicine_catalogue(tenant_id, id);
 
-alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_pkey" PRIMARY KEY (id);
-
-alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_status_check" CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])));
-
 alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 
-alter table public."pharmacy_suppliers" add constraint "pharmacy_suppliers_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."subscription_plans" add constraint "subscription_plans_billing_interval_check" CHECK ((billing_interval = ANY (ARRAY['monthly'::text, 'annual'::text])));
-
-alter table public."subscription_plans" add constraint "subscription_plans_pkey" PRIMARY KEY (id);
-
-alter table public."subscription_plans" add constraint "subscription_plans_plan_code_key" UNIQUE (plan_code);
-
-alter table public."subscription_plans" add constraint "subscription_plans_price_check" CHECK ((price >= (0)::numeric));
-
 alter table public."tenant_memberships" add constraint "tenant_memberships_invited_by_fkey" FOREIGN KEY (invited_by) REFERENCES auth.users(id) ON DELETE SET NULL;
-
-alter table public."tenant_memberships" add constraint "tenant_memberships_pkey" PRIMARY KEY (id);
-
-alter table public."tenant_memberships" add constraint "tenant_memberships_role_check" CHECK ((role = ANY (ARRAY['owner'::text, 'admin'::text, 'manager'::text, 'doctor'::text, 'pharmacist'::text, 'lab_technician'::text, 'pathologist'::text, 'care_worker'::text, 'receptionist'::text, 'analyst'::text, 'staff'::text])));
-
-alter table public."tenant_memberships" add constraint "tenant_memberships_status_check" CHECK ((status = ANY (ARRAY['invited'::text, 'active'::text, 'suspended'::text, 'removed'::text])));
 
 alter table public."tenant_memberships" add constraint "tenant_memberships_tenant_id_branch_id_fkey" FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id);
 
 alter table public."tenant_memberships" add constraint "tenant_memberships_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 
-alter table public."tenant_memberships" add constraint "tenant_memberships_tenant_id_user_id_key" UNIQUE (tenant_id, user_id);
-
 alter table public."tenant_memberships" add constraint "tenant_memberships_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
-
-alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_module_key_check" CHECK ((module_key = ANY (ARRAY['patient_suite'::text, 'pharmacy_suite'::text, 'laboratory_suite'::text, 'doctor_suite'::text, 'care_connect'::text, 'analytics'::text])));
-
-alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_pkey" PRIMARY KEY (id);
 
 alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
 
-alter table public."tenant_module_entitlements" add constraint "tenant_module_entitlements_tenant_id_module_key_key" UNIQUE (tenant_id, module_key);
-
-alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_pkey" PRIMARY KEY (id);
-
 alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_plan_id_fkey" FOREIGN KEY (plan_id) REFERENCES subscription_plans(id);
 
-alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_status_check" CHECK ((status = ANY (ARRAY['trial'::text, 'active'::text, 'past_due'::text, 'cancelled'::text, 'expired'::text, 'suspended'::text])));
-
 alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-
-alter table public."tenant_subscriptions" add constraint "tenant_subscriptions_tenant_id_id_key" UNIQUE (tenant_id, id);
-
-alter table public."tenants" add constraint "tenants_pkey" PRIMARY KEY (id);
-
-alter table public."tenants" add constraint "tenants_slug_key" UNIQUE (slug);
-
-alter table public."tenants" add constraint "tenants_status_check" CHECK ((status = ANY (ARRAY['trial'::text, 'active'::text, 'suspended'::text, 'closed'::text])));
-
-alter table public."user_profiles" add constraint "user_profiles_pkey" PRIMARY KEY (user_id);
 
 alter table public."user_profiles" add constraint "user_profiles_user_id_fkey" FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
@@ -1531,7 +1530,6 @@ CREATE TRIGGER touch_updated_at BEFORE UPDATE ON public.tenants FOR EACH ROW EXE
 
 CREATE TRIGGER touch_updated_at BEFORE UPDATE ON public.user_profiles FOR EACH ROW EXECUTE FUNCTION private.touch_updated_at();
 
--- Least-privilege API grants. RLS policies remain the row-level authorization boundary.
 grant select, insert, update, delete on all tables in schema public to authenticated;
 revoke all on all tables in schema public from anon;
 grant execute on function private.has_module_access(uuid,text,uuid,boolean) to authenticated;
