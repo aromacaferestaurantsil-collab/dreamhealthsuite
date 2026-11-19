@@ -1,0 +1,39 @@
+import { useEffect,useState } from 'react';
+import { requireSupabase } from '@/lib/supabase';
+import { pharmacySubmitCustomerOrder } from '@/services/healthsuite';
+import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select,SelectContent,SelectItem,SelectTrigger,SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+
+export const route={path:'/pharmacy-order',layout:'public',access:'authenticated'};
+const Field=({label,children})=><div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
+const blank=()=>({medicine_id:'',requested_name:'',quantity:'1'});
+export default function PharmacyOrderPortal(){
+ const db=requireSupabase();
+ const [patient,setPatient]=useState(null);const [medicines,setMedicines]=useState([]);const [branches,setBranches]=useState([]);
+ const [branch,setBranch]=useState('');const [lines,setLines]=useState([blank()]);const [file,setFile]=useState(null);const [notes,setNotes]=useState('');const [busy,setBusy]=useState(false);
+ useEffect(()=>{(async()=>{try{const {data:{user}}=await db.auth.getUser();if(!user)return;
+  const {data:p,error}=await db.from('patients').select('id,tenant_id,branch_id,patient_code,full_name').eq('created_by',user.id).eq('status','active').limit(1).maybeSingle();if(error)throw error;if(!p){setPatient(null);return;}setPatient(p);setBranch(p.branch_id||'');
+  const [m,b]=await Promise.all([db.from('medicine_catalogue').select('id,name,strength,prescription_required').eq('tenant_id',p.tenant_id).eq('status','active').order('name').limit(1000),db.from('branches').select('id,name').eq('tenant_id',p.tenant_id).eq('status','active').order('name')]);
+  if(m.error)throw m.error;if(b.error)throw b.error;setMedicines(m.data||[]);setBranches(b.data||[]);
+ }catch(e){toast.error(e.message||'Unable to load patient ordering')}})()},[]);
+ const updateLine=(i,key,value)=>setLines(xs=>xs.map((x,j)=>i===j?{...x,[key]:value}:x));
+ async function submit(e){e.preventDefault();if(!patient||!branch)return toast.error('Patient profile or branch is not linked to this account');
+  const items=lines.filter(x=>x.medicine_id||x.requested_name.trim()).map(x=>({medicine_id:x.medicine_id||null,requested_name:x.requested_name.trim()||null,quantity:Number(x.quantity)}));if(!items.length)return toast.error('Add at least one medicine');
+  setBusy(true);try{let path=null;if(file){if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('Upload a PDF or JPG/PNG/WEBP prescription');if(file.size>10*1024*1024)throw new Error('Prescription must be 10 MB or smaller');const ext=file.name.split('.').pop().toLowerCase();path=`${patient.tenant_id}/${patient.id}/${crypto.randomUUID()}.${ext}`;const {error}=await db.storage.from('pharmacy-prescriptions').upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;}
+  const orderNumber='RX-'+Date.now().toString(36).toUpperCase();await pharmacySubmitCustomerOrder({tenantId:patient.tenant_id,branchId:branch,orderNumber,items,prescriptionPath:path,notes});
+  toast.success('Medicine request submitted. The pharmacist will review it before confirmation.');setLines([blank()]);setFile(null);setNotes('');
+ }catch(e){toast.error(e.message||'Could not submit medicine request')}finally{setBusy(false)}}
+ return <main className="mx-auto max-w-3xl space-y-5 p-4 md:p-8"><header><p className="text-xs font-bold uppercase tracking-widest text-primary">HealthBuddy 360 · Patient</p><h1 className="text-3xl font-black">Order medicines</h1><p className="text-sm text-muted-foreground">Submit a medicine request or upload a prescription. A pharmacist must review prescription medicines before approval.</p></header>
+ {!patient?<Card><CardHeader><CardTitle>Patient profile not linked</CardTitle></CardHeader><CardContent className="text-sm text-muted-foreground">Your account does not yet have a patient record linked to it. Ask the pharmacy or care provider to link your account to your patient profile before ordering.</CardContent></Card>:<Card><CardHeader><CardTitle>{patient.full_name} · {patient.patient_code}</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="space-y-4"><Field label="Pickup / service branch"><Select value={branch} onValueChange={setBranch}><SelectTrigger><SelectValue placeholder="Choose branch"/></SelectTrigger><SelectContent>{branches.map(b=><SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select></Field>
+ {lines.map((line,i)=><div key={i} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_100px_auto]"><div className="space-y-2"><Field label="Select from catalogue"><Select value={line.medicine_id} onValueChange={v=>updateLine(i,'medicine_id',v)}><SelectTrigger><SelectValue placeholder="Choose medicine"/></SelectTrigger><SelectContent>{medicines.map(m=><SelectItem key={m.id} value={m.id}>{m.name} {m.strength||''}{m.prescription_required?' · Prescription required':''}</SelectItem>)}</SelectContent></Select></Field><Field label="Or enter requested medicine"><Input value={line.requested_name} onChange={e=>updateLine(i,'requested_name',e.target.value)} placeholder="Medicine name (optional if selected above)"/></Field></div><Field label="Quantity"><Input type="number" min="1" step="1" value={line.quantity} onChange={e=>updateLine(i,'quantity',e.target.value)}/></Field><div className="flex items-end"><Button type="button" variant="ghost" onClick={()=>setLines(xs=>xs.filter((_,j)=>j!==i))}>Remove</Button></div></div>)}
+ <Button type="button" variant="outline" onClick={()=>setLines(xs=>[...xs,blank()])}>Add medicine</Button>
+ <Field label="Prescription upload (PDF or photo)"><Input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e=>setFile(e.target.files?.[0]||null)}/></Field>
+ <Field label="Notes for pharmacist"><Input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Optional instructions"/></Field>
+ <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">Prescription uploads are stored in a private bucket. The pharmacy will review the request; submitting does not confirm availability or dispense medicine.</div>
+ <Button disabled={busy}>{busy?'Submitting…':'Submit medicine request'}</Button></form></CardContent></Card>}
+ </main>;
+}
