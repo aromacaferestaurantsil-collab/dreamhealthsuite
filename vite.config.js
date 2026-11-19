@@ -5,7 +5,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/dreamhealthsuite/',
+  base: process.env.GITHUB_PAGES === 'true' ? '/dreamhealthsuite/' : '/',
   build: { target: "esnext" },
   resolve: {
     alias: {
