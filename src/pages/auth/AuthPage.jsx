@@ -39,7 +39,8 @@ export default function AuthPage({ mode }) {
         if (authError) throw authError;
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
-          navigate('/demo-workspace', { replace: true });
+          const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
+          navigate(!patientLinkError && linkedPatient ? '/pharmacy-order' : '/demo-workspace', { replace: true });
         } else {
           setNotice('Check your email to confirm your account. After confirmation, sign in and open /demo-workspace to claim the synthetic testing workspace.');
         }
@@ -48,6 +49,8 @@ export default function AuthPage({ mode }) {
           email: email.trim().toLowerCase(), password,
         });
         if (authError) throw authError;
+        const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
+        if (!patientLinkError && linkedPatient) { navigate('/pharmacy-order', { replace: true }); return; }
         const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
         navigate(membershipRows?.length ? '/' : '/demo-workspace', { replace: true });
       }
