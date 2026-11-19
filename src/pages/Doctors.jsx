@@ -1,18 +1,18 @@
 import OperationalModule from './OperationalModule';
 export const route = { path: '/doctors', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Stethoscope', label: 'DoctorSuite', order: 12, profiles: ['Admin_c'] };
+export const nav = { icon: 'Stethoscope', label: 'DoctorSuite', order: 12, profiles: null };
 const config = {
- title:'DoctorSuite',audience:'Clinics and consultations',
- description:'Maintain doctor credentials, clinic schedules and patient appointments. Clinical notes and prescriptions require role controls and an auditable authorisation process.',
+ title:'DoctorSuite', audience:'Clinics and consultations',
+ description:'Maintain verified doctor credentials and tenant-scoped appointment schedules. Clinical notes and prescriptions remain subject to role-based authorisation.',
  tags:['Doctor directory','Appointments','Follow-ups','Clinical governance'],
  entities:[
-  {table:'doctor_profiles_c',label:'Doctors',singular:'Doctor',fields:[
-   {name:'doctor_name_c',label:'Doctor name',type:'Text',required:true},{name:'registration_number_c',label:'Medical registration number',type:'Text',required:true},{name:'speciality_c',label:'Speciality',type:'Text'},{name:'phone_c',label:'Phone',type:'Text'},{name:'email_c',label:'Email',type:'Text'},{name:'consultation_fee_c',label:'Consultation fee',type:'Decimal'},{name:'status_c',label:'Status',type:'Text',options:['Active','Inactive']}
+  {table:'doctor_profiles',label:'Doctors',singular:'Doctor',fields:[
+   {name:'doctor_code',label:'Doctor code',required:true},{name:'full_name',label:'Doctor name',required:true},{name:'specialty',label:'Speciality'},{name:'qualifications',label:'Qualifications'},{name:'registration_number',label:'Medical registration number',required:true},{name:'phone',label:'Phone'},{name:'email',label:'Email'},{name:'consultation_fee',label:'Consultation fee',type:'number'},{name:'status',label:'Status',options:['active','inactive']}
   ]},
-  {table:'doctor_appointments_c',label:'Appointments',singular:'Appointment',fields:[
-   {name:'appointment_number_c',label:'Appointment number',type:'Text',required:true},{name:'doctor_c',label:'Doctor record ID',type:'Text'},{name:'patient_c',label:'Patient record ID',type:'Text'},{name:'appointment_at_c',label:'Appointment date and time',type:'DateTime',required:true},{name:'duration_minutes_c',label:'Duration minutes',type:'Number'},{name:'reason_c',label:'Reason for visit',type:'MultilineText'},{name:'status_c',label:'Status',type:'Text',options:['Requested','Confirmed','Checked In','Completed','Cancelled','No Show']},{name:'consultation_fee_c',label:'Consultation fee',type:'Decimal'}
+  {table:'doctor_appointments',label:'Appointments',singular:'Appointment',branchScoped:true,createdBy:'created_by',fields:[
+   {name:'patient_id',label:'Patient UUID',required:true},{name:'doctor_id',label:'Doctor UUID',required:true},{name:'appointment_number',label:'Appointment number',required:true},{name:'starts_at',label:'Starts at',type:'datetime',required:true},{name:'ends_at',label:'Ends at',type:'datetime',required:true},{name:'appointment_status',label:'Status',options:['scheduled','checked_in','in_consultation','completed','cancelled','no_show']},{name:'reason',label:'Reason',type:'multiline'},{name:'notes',label:'Notes',type:'multiline'}
   ]}
  ],
- notes:['Registration numbers should be verified with the applicable professional council before enabling clinical privileges.','No referral commissions are supported. Payments must represent documented, legitimate professional services.']
+ notes:['Verify medical registration with the applicable professional council before granting clinical privileges.','Do not store consultation notes or prescriptions in this operational register; use the dedicated clinical workflow with explicit authorisation and audit.']
 };
 export default function Doctors(){return <OperationalModule config={config}/>;}
