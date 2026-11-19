@@ -18,7 +18,7 @@ export default function Tenants() {
   const [search, setSearch] = useState('');
   const { data, loading, error, run } = useFetch(() => {
     let query = sdk.table('tenants_c').select(FIELDS).orderByDesc('CreatedOn').limit(100);
-    if (search) query = query.where(window.ApperSDK.CoreSDK.contains('Name', search));
+    if (search) query = query.where({ field: 'display_name', operator: 'ilike', value: `%${search}%` });
     return query.fetch().then(result => {
       if (!result.success) throw new Error(result.message);
       return result.data;
