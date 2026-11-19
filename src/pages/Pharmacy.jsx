@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 
 export const route = { path: '/pharmacy', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Pill', label: 'PharmaSuite', order: 10, profiles: ['Admin_c','Manager','Pharmacist'] };
+export const nav = { icon: 'Pill', label: 'Inventory', section: 'PharmaSuite', order: 10, profiles: ['Admin_c','Manager','Pharmacist'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const today = () => new Date().toISOString().slice(0,10);
