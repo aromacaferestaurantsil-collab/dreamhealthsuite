@@ -12,7 +12,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   });
 }
 
-createRoot(document.getElementById('root')).render(
+if (typeof window !== 'undefined') {\n  try {\n    const redirect = sessionStorage.getItem('healthbuddy-redirect');\n    if (redirect) { sessionStorage.removeItem('healthbuddy-redirect'); window.history.replaceState(null, '', import.meta.env.BASE_URL + redirect); }\n  } catch { /* private browsing may disable session storage */ }\n}\n\ncreateRoot(document.getElementById('root')).render(
   <Provider store={store}>
     <App />
   </Provider>
