@@ -81,7 +81,7 @@ export default function RootLayout() {
   const activeTenant = useMemo(()=>memberships.find(m=>m.tenant_id===activeTenantId)??null,[memberships,activeTenantId]);
   useEffect(() => {
     if (user && (location.pathname === '/login' || location.pathname === '/signup' || location.pathname.endsWith('/login') || location.pathname.endsWith('/signup'))) navigate('/', { replace: true });
-    else if (user && user.profile === 'NoTenant' && location.pathname !== '/workspace/new') navigate('/workspace/new', { replace: true });
+    else if (user && user.profile === 'NoTenant' && location.pathname !== '/workspace/new' && location.pathname !== '/pharmacy-order') navigate('/workspace/new', { replace: true });
     else if (user && user.profile !== 'NoTenant' && location.pathname === '/workspace/new') navigate('/', { replace: true });
   }, [user, location.pathname, navigate]);
 
