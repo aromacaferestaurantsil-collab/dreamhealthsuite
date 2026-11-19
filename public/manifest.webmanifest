@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "HealthBuddy 360",
   "short_name": "HealthBuddy",
   "description": "HealthBuddy 360 healthcare operations platform",
-  "start_url": "/dreamhealthsuite/",
-  "scope": "/dreamhealthsuite/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#f8fafc",
