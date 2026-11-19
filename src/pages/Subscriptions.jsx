@@ -1,79 +1,13 @@
-import { useState } from 'react';
+import { useEffect,useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useFetch } from '@/hooks/useFetch';
-import { sdk } from '@/services/sdk';
-import ApperIcon from '@/components/ApperIcon';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTenant } from '@/layouts/RootLayout';
+import { requireSupabase } from '@/lib/supabase';
+import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { ListSkeleton } from '@/components/PageSkeleton';
-
-export const route = { path: '/subscriptions', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'CreditCard', label: 'Subscriptions', order: 4, profiles: ['Admin_c'] };
-
-const FIELDS = ['Name', 'tenant_c', 'plan_c', 'billing_cycle_c', 'status_c', 'amount_c', 'currency_c', 'start_date_c', 'end_date_c', 'trial_days_c'];
-
-export default function Subscriptions() {
-  const [search, setSearch] = useState('');
-  const { data, loading, error, run } = useFetch(() => {
-    let query = sdk.table('subscriptions_c').select(FIELDS).orderByDesc('CreatedOn').limit(100);
-    if (search) query = query.where(window.ApperSDK.CoreSDK.contains('Name', search));
-    return query.fetch().then(result => {
-      if (!result.success) throw new Error(result.message);
-      return result.data;
-    });
-  }, [search]);
-  const rows = data ?? [];
-  const active = rows.filter(row => row.status_c === 'Active').length;
-  const trials = rows.filter(row => row.status_c === 'Trial').length;
-  const overdue = rows.filter(row => row.status_c === 'Past Due').length;
-
-  return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-xs font-extrabold uppercase tracking-widest text-primary">Super Admin</div>
-          <h1 className="brand-heading mt-1 text-3xl font-black">Subscriptions and licences</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Monitor plans, trial periods, renewal dates and account status.</p>
-        </div>
-        <Button asChild><Link to="/subscriptions/new">Create subscription <ApperIcon name="Plus" size={16} className="ml-2" /></Link></Button>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {[['Active subscriptions', active, 'Check renewals'], ['Trial accounts', trials, 'Review trial conversion'], ['Past due', overdue, 'Follow up payment']].map(([label, value, note]) => (
-          <Card key={label}><CardContent className="p-5"><div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</div><div className="brand-heading mt-2 text-3xl font-black">{loading ? '—' : value}</div><div className="mt-1 text-xs text-muted-foreground">{note}</div></CardContent></Card>
-        ))}
-      </div>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle>Licence register <Badge variant="secondary" className="ml-2">{rows.length}</Badge></CardTitle>
-            <Input className="w-full sm:w-72" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search subscription reference…" />
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading && !data ? <ListSkeleton rows={6} /> : error ? <div className="text-sm text-destructive">{error.message} <Button onClick={run} variant="outline" size="sm">Retry</Button></div> : rows.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="py-3">Reference / customer</th><th>Plan</th><th>Billing</th><th>Amount</th><th>End date</th><th>Status</th><th /></tr></thead>
-                <tbody className="divide-y divide-border">
-                  {rows.map(row => (
-                    <tr key={row.Id} className="hover:bg-accent">
-                      <td className="py-4"><div className="font-bold">{row.Name}</div><div className="text-xs text-muted-foreground">{row.tenant_c?.Name ?? 'Tenant not linked'}</div></td>
-                      <td>{row.plan_c}</td><td>{row.billing_cycle_c}</td>
-                      <td className="font-bold">{row.currency_c} {Number(row.amount_c ?? 0).toLocaleString('en-IN')}</td>
-                      <td>{row.end_date_c || 'No expiry'}</td>
-                      <td><Badge variant={row.status_c === 'Active' ? 'default' : row.status_c === 'Past Due' ? 'destructive' : 'secondary'}>{row.status_c}</Badge></td>
-                      <td className="text-right"><Button asChild variant="ghost" size="sm"><Link to={`/subscriptions/${row.Id}`}>Manage <ApperIcon name="ChevronRight" size={15} /></Link></Button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : <div className="py-10 text-center text-sm text-muted-foreground">No subscription records yet. Create a licence to get started.</div>}
-        </CardContent>
-      </Card>
-      <p className="text-xs leading-5 text-muted-foreground">Demo amounts and dates are sample records, not published pricing. Expired or suspended accounts should retain their data and permit renewal or export; do not delete clinical records because a licence expires.</p>
-    </div>
-  );
+import { Button } from '@/components/ui/button';
+export const route={path:'/subscriptions',layout:'owner',access:'authenticated'};
+export const nav={icon:'CreditCard',label:'Subscription',order:4,profiles:null};
+export default function Subscriptions(){const {activeTenant}=useTenant();const [rows,setRows]=useState([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');
+ useEffect(()=>{let alive=true;(async()=>{setLoading(true);setError('');if(!activeTenant?.tenant_id){setRows([]);setLoading(false);return;}const {data,error}=await requireSupabase().from('tenant_subscriptions').select('id,status,starts_at,trial_ends_at,current_period_start,current_period_end,cancelled_at,created_at,subscription_plans(name,price,currency,billing_interval)').eq('tenant_id',activeTenant.tenant_id).order('created_at',{ascending:false});if(!alive)return;if(error)setError(error.message);else setRows(data||[]);setLoading(false)})();return()=>{alive=false}},[activeTenant?.tenant_id]);
+ return <div className="mx-auto max-w-5xl space-y-6"><div><div className="text-xs font-bold uppercase tracking-widest text-primary">Account billing</div><h1 className="brand-heading mt-1 text-3xl font-black">Subscription and plan</h1><p className="mt-1 text-sm text-muted-foreground">Subscription information for the active organisation.</p></div>{!activeTenant?<Card><CardContent className="p-5">Select an organisation workspace to view its subscription.</CardContent></Card>:loading?<p className="text-sm text-muted-foreground">Loading subscription…</p>:error?<p className="text-sm text-destructive">{error}</p>:rows.length?<div className="space-y-4">{rows.map(row=><Card key={row.id}><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle>{row.subscription_plans?.name||'Subscription plan'}</CardTitle><Badge variant={row.status==='active'?'default':'secondary'}>{row.status}</Badge></div></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 text-sm"><div><div className="text-muted-foreground">Plan price</div><strong>{row.subscription_plans?.currency||'INR'} {Number(row.subscription_plans?.price||0).toLocaleString('en-IN')} / {row.subscription_plans?.billing_interval||'—'}</strong></div><div><div className="text-muted-foreground">Started</div><strong>{row.starts_at?new Date(row.starts_at).toLocaleDateString():'—'}</strong></div><div><div className="text-muted-foreground">Trial ends</div><strong>{row.trial_ends_at?new Date(row.trial_ends_at).toLocaleDateString():'—'}</strong></div><div><div className="text-muted-foreground">Current period ends</div><strong>{row.current_period_end?new Date(row.current_period_end).toLocaleDateString():'—'}</strong></div></CardContent></Card>)}</div>:<Card><CardContent className="p-6 text-sm text-muted-foreground">No subscription has been assigned to this workspace yet. Contact the platform administrator for plan activation.</CardContent></Card>}</div>;
 }

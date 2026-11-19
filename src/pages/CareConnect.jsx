@@ -1,15 +1,18 @@
 import OperationalModule from './OperationalModule';
 export const route = { path: '/care-connect', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Truck', label: 'CareConnect', order: 14, profiles: ['Admin_c'] };
+export const nav = { icon: 'Truck', label: 'CareConnect', order: 14, profiles: null };
 const config = {
- title:'CareConnect',audience:'Delivery and sample collection operations',
+ title:'CareConnect', audience:'Delivery and sample collection operations',
  description:'Create and monitor delivery and collection jobs with minimal patient data, clear assignment states and documented handover.',
  tags:['Job queue','Assignments','OTP handover','Sample collection'],
  entities:[
-  {table:'care_jobs_c',label:'Jobs',singular:'Job',fields:[
-   {name:'job_number_c',label:'Job number',type:'Text',required:true},{name:'job_type_c',label:'Job type',type:'Text',options:['Medicine Delivery','Sample Collection','Report Delivery']},{name:'patient_c',label:'Patient record ID',type:'Text'},{name:'booking_c',label:'Lab booking record ID',type:'Text'},{name:'assigned_to_c',label:'Assigned staff ID',type:'Text'},{name:'status_c',label:'Status',type:'Text',options:['Queued','Assigned','Accepted','In Progress','Completed','Failed','Cancelled']},{name:'scheduled_at_c',label:'Scheduled at',type:'DateTime'},{name:'completed_at_c',label:'Completed at',type:'DateTime'},{name:'notes_c',label:'Operational notes',type:'MultilineText'}
+  {table:'care_service_catalogue',label:'Service catalogue',singular:'Service',fields:[
+   {name:'service_code',label:'Service code',required:true},{name:'name',label:'Service name',required:true},{name:'description',label:'Description',type:'multiline'},{name:'base_price',label:'Base price',type:'number'},{name:'duration_minutes',label:'Duration (minutes)',type:'number'},{name:'status',label:'Status',options:['active','inactive']}
+  ]},
+  {table:'care_jobs',label:'Jobs',singular:'Job',branchScoped:true,createdBy:'created_by',fields:[
+   {name:'patient_id',label:'Patient UUID'},{name:'service_id',label:'Service UUID',required:true},{name:'job_number',label:'Job number',required:true},{name:'assigned_to',label:'Assigned staff UUID'},{name:'scheduled_start',label:'Scheduled start',type:'datetime'},{name:'scheduled_end',label:'Scheduled end',type:'datetime'},{name:'job_status',label:'Status',options:['requested','approved','assigned','in_progress','completed','cancelled']},{name:'instructions',label:'Operational instructions',type:'multiline'},{name:'price',label:'Price',type:'number'}
   ]}
  ],
- notes:['This admin console intentionally does not display raw OTPs or patient medical details to delivery staff.','Production assignment, OTP verification, barcode handover and staff-only access must be enforced by authenticated server functions.']
+ notes:['The admin console never displays raw OTPs or unnecessary patient medical details to delivery staff.','Production assignment, OTP verification, barcode handover and staff-only access must be enforced by authenticated server functions.']
 };
 export default function CareConnect(){return <OperationalModule config={config}/>;}
