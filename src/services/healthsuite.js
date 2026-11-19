@@ -61,3 +61,8 @@ export async function pharmacyProcessReturn({tenantId,branchId,returnNumber,retu
  const {data,error}=await requireSupabase().rpc('pharmacy_process_return',{p_tenant_id:tenantId,p_branch_id:branchId,p_return_number:returnNumber,p_return_type:returnType,p_reason:reason,p_sale_id:saleId||null,p_supplier_id:supplierId||null,p_items:items});
  if(error) throw error; return data;
 }
+
+export async function pharmacyCheckoutV2({tenantId,branchId,invoiceNumber,items,paymentMethod,paymentStatus='pending',idempotencyKey,patientId=null,prescriptionReference=null}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_checkout_v2',{p_tenant_id:tenantId,p_branch_id:branchId,p_invoice_number:invoiceNumber,p_items:items,p_payment_method:paymentMethod,p_payment_status:paymentStatus,p_idempotency_key:idempotencyKey,p_patient_id:patientId,p_prescription_reference:prescriptionReference});
+ if(error) throw error; return data;
+}
