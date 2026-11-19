@@ -33,22 +33,23 @@ export default function AuthPage({ mode }) {
           options: {
             data: { full_name: fullName.trim() },
             // Return confirmation links to the deployed web app, not a localhost default.
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
           },
         });
         if (authError) throw authError;
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
-          navigate('/', { replace: true });
+          navigate('/demo-workspace', { replace: true });
         } else {
-          setNotice('Check your email to confirm your account. After confirmation, sign in and create or join a workspace.');
+          setNotice('Check your email to confirm your account. After confirmation, sign in and open /demo-workspace to claim the synthetic testing workspace.');
         }
       } else {
         const { error: authError } = await client.auth.signInWithPassword({
           email: email.trim().toLowerCase(), password,
         });
         if (authError) throw authError;
-        navigate('/', { replace: true });
+        const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
+        navigate(membershipRows?.length ? '/' : '/demo-workspace', { replace: true });
       }
     } catch (e) {
       setError(e?.message || 'Authentication failed.');
@@ -57,7 +58,7 @@ export default function AuthPage({ mode }) {
 
   const base = profileParam ? `/${profileParam}` : '';
   return (
-    <AuthLayout title={signup ? 'Create a HealthSuite account' : 'Welcome to HealthSuite 360'} description={signup ? 'Create your secure account. Workspace access is granted through tenant membership.' : 'Sign in to your secure healthcare workspace.'}>
+    <AuthLayout title={signup ? 'Create a HealthBuddy account' : 'Welcome to HealthBuddy 360'} description={signup ? 'Create your secure account. Workspace access is granted through tenant membership.' : 'Sign in to your secure healthcare workspace.'}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         {signup && <div className="space-y-1"><Label htmlFor="fullName">Full name</Label><Input id="fullName" value={fullName} onChange={e=>setFullName(e.target.value)} required autoComplete="name" /></div>}
         <div className="space-y-1"><Label htmlFor="email">Email</Label><Input id="email" type="email" value={email} onChange={e=>setEmail(e.target.value)} required autoComplete="email" /></div>
