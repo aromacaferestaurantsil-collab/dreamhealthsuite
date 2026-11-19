@@ -34,6 +34,10 @@ create index if not exists pharmacy_supplier_payments_supplier_idx
  on public.pharmacy_supplier_payments(tenant_id,supplier_id,paid_at desc);
 create index if not exists pharmacy_supplier_payments_order_idx
  on public.pharmacy_supplier_payments(tenant_id,purchase_order_id,paid_at desc);
+alter table public.pharmacy_supplier_payments
+ add constraint pharmacy_supplier_payments_tenant_branch_fk foreign key(tenant_id,branch_id) references public.branches(tenant_id,id),
+ add constraint pharmacy_supplier_payments_tenant_supplier_fk foreign key(tenant_id,supplier_id) references public.pharmacy_suppliers(tenant_id,id),
+ add constraint pharmacy_supplier_payments_tenant_order_fk foreign key(tenant_id,purchase_order_id) references public.pharmacy_purchase_orders(tenant_id,id);
 alter table public.pharmacy_supplier_payments enable row level security;
 grant select,insert on public.pharmacy_supplier_payments to authenticated;
 create policy supplier_payments_read on public.pharmacy_supplier_payments for select to authenticated
@@ -61,6 +65,11 @@ create table if not exists public.pharmacy_controlled_drug_register (
 );
 create index if not exists pharmacy_controlled_register_date_idx
  on public.pharmacy_controlled_drug_register(tenant_id,branch_id,recorded_at desc);
+alter table public.pharmacy_controlled_drug_register
+ add constraint pharmacy_controlled_register_tenant_branch_fk foreign key(tenant_id,branch_id) references public.branches(tenant_id,id),
+ add constraint pharmacy_controlled_register_tenant_medicine_fk foreign key(tenant_id,medicine_id) references public.medicine_catalogue(tenant_id,id),
+ add constraint pharmacy_controlled_register_tenant_batch_fk foreign key(tenant_id,batch_id) references public.medicine_batches(tenant_id,id),
+ add constraint pharmacy_controlled_register_tenant_patient_fk foreign key(tenant_id,patient_id) references public.patients(tenant_id,id);
 alter table public.pharmacy_controlled_drug_register enable row level security;
 grant select,insert on public.pharmacy_controlled_drug_register to authenticated;
 create policy controlled_register_read on public.pharmacy_controlled_drug_register for select to authenticated
@@ -87,6 +96,9 @@ create table if not exists public.pharmacy_catalogue_photo_suggestions (
 );
 create index if not exists pharmacy_photo_suggestions_queue_idx
  on public.pharmacy_catalogue_photo_suggestions(tenant_id,branch_id,review_status,created_at desc);
+alter table public.pharmacy_catalogue_photo_suggestions
+ add constraint pharmacy_photo_suggestions_tenant_branch_fk foreign key(tenant_id,branch_id) references public.branches(tenant_id,id),
+ add constraint pharmacy_photo_suggestions_tenant_medicine_fk foreign key(tenant_id,medicine_id) references public.medicine_catalogue(tenant_id,id);
 alter table public.pharmacy_catalogue_photo_suggestions enable row level security;
 grant select,insert,update on public.pharmacy_catalogue_photo_suggestions to authenticated;
 create policy photo_suggestions_read on public.pharmacy_catalogue_photo_suggestions for select to authenticated
@@ -204,6 +216,8 @@ begin
  if auth.uid() is null then raise exception 'Authentication required'; end if;
  select * into o from public.pharmacy_customer_orders where id=p_order_id and tenant_id=p_tenant_id for update;
  if not found or not private.has_module_access(p_tenant_id,'pharmacy_suite',o.branch_id,true) then raise exception 'Order not found or access denied'; end if;
+ if not exists(select 1 from public.tenant_memberships m where m.tenant_id=p_tenant_id and m.user_id=auth.uid()
+   and m.status='active' and m.role in ('owner','admin','pharmacist')) then raise exception 'Pharmacist review permission required'; end if;
  if p_decision not in ('approved','rejected','clarification_required') then raise exception 'Invalid review decision'; end if;
  if o.order_status not in ('submitted','review_required') then raise exception 'Order is not awaiting review'; end if;
  for v_item in select value from jsonb_array_elements(coalesce(p_item_decisions,'[]'::jsonb)) loop
@@ -271,6 +285,8 @@ as $$
 declare v_id uuid;
 begin
  if auth.uid() is null or not private.has_module_access(p_tenant_id,'pharmacy_suite',p_branch_id,true) then raise exception 'No pharmacy permission'; end if;
+ if not exists(select 1 from public.tenant_memberships m where m.tenant_id=p_tenant_id and m.user_id=auth.uid()
+   and m.status='active' and m.role in ('owner','admin','pharmacist')) then raise exception 'Pharmacist register permission required'; end if;
  if p_transaction_type not in ('purchase','sale','return_in','return_out','adjustment') or
    ((p_quantity_in>0)::int+(p_quantity_out>0)::int)<>1 then raise exception 'Invalid register movement'; end if;
  if not exists(select 1 from public.medicine_catalogue where id=p_medicine_id and tenant_id=p_tenant_id) then raise exception 'Medicine not found'; end if;
@@ -291,6 +307,8 @@ declare s public.pharmacy_catalogue_photo_suggestions%rowtype;
 begin
  select * into s from public.pharmacy_catalogue_photo_suggestions where id=p_suggestion_id and tenant_id=p_tenant_id for update;
  if not found or not private.has_module_access(p_tenant_id,'pharmacy_suite',s.branch_id,true) then raise exception 'Photo suggestion not found or access denied'; end if;
+ if not exists(select 1 from public.tenant_memberships m where m.tenant_id=p_tenant_id and m.user_id=auth.uid()
+   and m.status='active' and m.role in ('owner','admin','pharmacist')) then raise exception 'Pharmacist review permission required'; end if;
  if s.review_status<>'pending' or p_decision not in ('approved','rejected') then raise exception 'Suggestion is not pending or decision invalid'; end if;
  if p_decision='approved' then
   if p_medicine_id is null or not exists(select 1 from public.medicine_catalogue where id=p_medicine_id and tenant_id=p_tenant_id) then raise exception 'Choose a valid catalogue medicine before confirming the photo'; end if;
@@ -382,6 +400,13 @@ create policy employee_attendance_delete on public.employee_attendance for delet
 drop policy if exists customer_orders_write on public.pharmacy_customer_orders;
 create policy customer_orders_insert on public.pharmacy_customer_orders for insert to authenticated
  with check(private.has_module_access(tenant_id,'pharmacy_suite',branch_id,true));
+create policy customer_orders_patient_read on public.pharmacy_customer_orders for select to authenticated
+ using(exists(select 1 from public.patients p where p.tenant_id=pharmacy_customer_orders.tenant_id
+  and p.id=pharmacy_customer_orders.patient_id and p.created_by=(select auth.uid())));
+create policy customer_orders_patient_insert on public.pharmacy_customer_orders for insert to authenticated
+ with check(order_status in ('submitted','review_required') and reviewed_by is null and reviewed_at is null
+  and exists(select 1 from public.patients p where p.tenant_id=pharmacy_customer_orders.tenant_id
+   and p.id=pharmacy_customer_orders.patient_id and p.created_by=(select auth.uid())));
 create policy customer_orders_update on public.pharmacy_customer_orders for update to authenticated
  using(private.has_module_access(tenant_id,'pharmacy_suite',branch_id,true))
  with check(private.has_module_access(tenant_id,'pharmacy_suite',branch_id,true));
@@ -391,6 +416,16 @@ create policy customer_orders_delete on public.pharmacy_customer_orders for dele
 drop policy if exists customer_order_items_write on public.pharmacy_customer_order_items;
 create policy customer_order_items_insert on public.pharmacy_customer_order_items for insert to authenticated
  with check(private.has_module_access(tenant_id,'pharmacy_suite',null,true));
+create policy customer_order_items_patient_read on public.pharmacy_customer_order_items for select to authenticated
+ using(exists(select 1 from public.pharmacy_customer_orders o join public.patients p
+  on p.tenant_id=o.tenant_id and p.id=o.patient_id
+  where o.tenant_id=pharmacy_customer_order_items.tenant_id and o.id=pharmacy_customer_order_items.order_id
+   and p.created_by=(select auth.uid())));
+create policy customer_order_items_patient_insert on public.pharmacy_customer_order_items for insert to authenticated
+ with check(exists(select 1 from public.pharmacy_customer_orders o join public.patients p
+  on p.tenant_id=o.tenant_id and p.id=o.patient_id
+  where o.tenant_id=pharmacy_customer_order_items.tenant_id and o.id=pharmacy_customer_order_items.order_id
+   and o.order_status in ('submitted','review_required') and p.created_by=(select auth.uid())));
 create policy customer_order_items_update on public.pharmacy_customer_order_items for update to authenticated
  using(private.has_module_access(tenant_id,'pharmacy_suite',null,true))
  with check(private.has_module_access(tenant_id,'pharmacy_suite',null,true));
