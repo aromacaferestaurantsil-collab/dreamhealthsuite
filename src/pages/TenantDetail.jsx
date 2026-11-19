@@ -1,65 +1,14 @@
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
-import { useFetch } from '@/hooks/useFetch';
-import { sdk } from '@/services/sdk';
-import ApperIcon from '@/components/ApperIcon';
+import { useEffect,useState } from 'react';
+import { Link,useParams } from 'react-router-dom';
+import { requireSupabase } from '@/lib/supabase';
+import { useTenant } from '@/layouts/RootLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'sonner';
-import { DetailSkeleton } from '@/components/PageSkeleton';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-
-export const route = { path: '/tenants/:id', layout: 'owner', access: 'authenticated' };
-
-const FIELDS = ['Name', 'business_type_c', 'status_c', 'modules_c', 'subscription_plan_c', 'email_c', 'phone_c', 'address_c', 'gstin_c'];
-
-export default function TenantDetail() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const [deleting, setDeleting] = useState(false);
-  const { data: tenant, loading, error, run } = useFetch(async () => {
-    const result = await sdk.table('tenants_c').select(FIELDS).get(id);
-    if (!result.success) return null;
-    return result.data;
-  }, [id]);
-
-  async function remove() {
-    setDeleting(true);
-    try {
-      const result = await sdk.table('tenants_c').remove([id]);
-      if (result.messages?.length) toast.error(result.messages[0]);
-      if (!result.data?.length) return;
-      toast.success('Business record deleted');
-      navigate('/tenants');
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  if (loading) return <DetailSkeleton />;
-  if (error) return <div className="text-sm text-destructive">{error.message} <Button onClick={run} variant="outline">Retry</Button></div>;
-  if (!tenant) return <div><Link to="/tenants">Back to Businesses</Link><p className="mt-6">Business not found or you do not have access.</p></div>;
-
-  return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Link to="/tenants" className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-foreground"><ApperIcon name="ArrowLeft" size={16} /> Back to Businesses</Link>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><Badge className="mb-2">Business tenant</Badge><h1 className="brand-heading text-3xl font-black">{tenant.Name}</h1><p className="mt-1 text-sm text-muted-foreground">{tenant.business_type_c}</p></div>
-        <Badge variant={tenant.status_c === 'Active' ? 'default' : 'secondary'}>{tenant.status_c}</Badge>
-      </div>
-      <Card><CardHeader><CardTitle>Organisation profile</CardTitle></CardHeader><CardContent className="grid gap-5 sm:grid-cols-2">
-        {[['Business email', tenant.email_c], ['Phone', tenant.phone_c], ['GSTIN', tenant.gstin_c], ['Address', tenant.address_c], ['Subscription plan', tenant.subscription_plan_c]].map(([label, value]) => <div key={label}><div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</div><div className="mt-1 text-sm font-semibold">{value || 'Not provided'}</div></div>)}
-      </CardContent></Card>
-      <Card><CardHeader><CardTitle>Licensed product modules</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">{(tenant.modules_c ?? []).length ? tenant.modules_c.map(module => <Badge key={module} variant="secondary">{module}</Badge>) : <p className="text-sm text-muted-foreground">No modules assigned yet.</p>}</CardContent></Card>
-      <div className="flex flex-wrap justify-end gap-3">
-        <Button asChild variant="outline"><Link to={`/tenants/${id}/edit`}>Edit business</Link></Button>
-        <Button asChild variant="outline"><Link to="/modules">Explore modules</Link></Button>
-        <AlertDialog>
-          <AlertDialogTrigger asChild><Button variant="destructive"><ApperIcon name="Trash2" size={16} className="mr-2" /> Delete record</Button></AlertDialogTrigger>
-          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete {tenant.Name}?</AlertDialogTitle><AlertDialogDescription>This removes this tenant record from the current workspace. Do not use deletion for subscription expiry; suspend access and retain customer data instead.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction disabled={deleting} onClick={remove}>{deleting ? 'Deleting…' : 'Delete business'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </div>
-  );
+export const route={path:'/tenants/:id',layout:'owner',access:'authenticated'};
+export default function TenantDetail(){const {id}=useParams();const {memberships,setActiveTenant}=useTenant();const [row,setRow]=useState(null);const [error,setError]=useState('');
+ useEffect(()=>{let alive=true;(async()=>{const {data,error}=await requireSupabase().from('tenants').select('id,legal_name,display_name,slug,status,country_code,timezone,created_at').eq('id',id).single();if(!alive)return;if(error)setError(error.message);else setRow(data)})();return()=>{alive=false}},[id]);
+ if(error)return <p className="text-sm text-destructive">{error}</p>;if(!row)return <p className="text-sm text-muted-foreground">Loading workspace…</p>;
+ const membership=memberships.find(m=>m.tenant_id===id);
+ return <div className="mx-auto max-w-4xl space-y-6"><Link to="/tenants" className="text-sm text-muted-foreground">← Back to businesses</Link><div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="brand-heading text-3xl font-black">{row.display_name}</h1><p className="text-sm text-muted-foreground">{row.legal_name}</p></div><Badge>{row.status}</Badge></div><Card><CardHeader><CardTitle>Workspace profile</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2 text-sm"><div><div className="text-muted-foreground">Workspace key</div><strong>{row.slug}</strong></div><div><div className="text-muted-foreground">Country</div><strong>{row.country_code||'—'}</strong></div><div><div className="text-muted-foreground">Timezone</div><strong>{row.timezone||'—'}</strong></div><div><div className="text-muted-foreground">Your role</div><strong>{membership?.role||'No active membership'}</strong></div></CardContent></Card><div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={()=>setActiveTenant(id)}>Set as active workspace</Button><Button asChild><Link to={'/tenants/'+id+'/edit'}>Edit profile</Link></Button></div></div>;
 }
