@@ -51,7 +51,7 @@ export default function PublicDownload() {
   const [downloading, setDownloading] = useState('');
   const { data: releases, loading: releasesLoading, error: releasesError, run: reloadReleases } = useFetch(() => sdk.table('software_releases_c')
     .select(RELEASE_FIELDS)
-    .where(window.ApperSDK.CoreSDK.eq('release_status_c', 'Published'))
+    .where({ field: 'release_status_c', operator: 'eq', value: 'Published' })
     .orderByDesc('published_at_c')
     .limit(300)
     .fetch()
@@ -61,7 +61,7 @@ export default function PublicDownload() {
     }), []);
   const { data: plans, loading: plansLoading } = useFetch(() => sdk.table('plans_c')
     .select(PLAN_FIELDS)
-    .where(window.ApperSDK.CoreSDK.eq('is_active_c', true))
+    .where({ field: 'is_active_c', operator: 'eq', value: true })
     .orderBy('sort_order_c')
     .limit(100)
     .fetch()
