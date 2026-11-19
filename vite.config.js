@@ -5,6 +5,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  base: '/dreamhealthsuite/',
   build: { target: "esnext" },
   resolve: {
     alias: {
