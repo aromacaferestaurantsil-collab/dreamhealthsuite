@@ -131,13 +131,14 @@ begin
   if v_batch.medicine_id<>(v_item->>'medicine_id')::uuid then raise exception 'Batch and medicine mismatch'; end if;
   if p_return_type='customer_return' then
    select si.* into v_sale_item from public.pharmacy_sale_items si join public.pharmacy_sales s on s.id=si.sale_id where si.sale_id=p_sale_id and si.batch_id=v_batch.id and si.medicine_id=v_batch.medicine_id and s.tenant_id=p_tenant_id and s.branch_id=p_branch_id limit 1;
-   if not found or v_qty>(select coalesce(sum(quantity),0) from public.pharmacy_sale_items where sale_id=p_sale_id and batch_id=v_batch.id) then raise exception 'Return exceeds original sold quantity for batch'; end if;
+   if not found or v_qty+coalesce((select sum(ri.quantity) from public.pharmacy_return_items ri join public.pharmacy_returns rr on rr.id=ri.return_id where rr.sale_id=p_sale_id and rr.return_type='customer_return' and rr.status='posted' and ri.batch_id=v_batch.id),0)>(select coalesce(sum(quantity),0) from public.pharmacy_sale_items where sale_id=p_sale_id and batch_id=v_batch.id) then raise exception 'Return exceeds remaining original sold quantity for batch'; end if;
    if coalesce(v_item->>'restock','true')='true' then
     update public.medicine_batches set quantity_on_hand=quantity_on_hand+v_qty where id=v_batch.id;
     insert into public.pharmacy_stock_movements(tenant_id,branch_id,medicine_id,batch_id,movement_type,quantity_delta,reference_type,reference_id,actor_user_id)
     values(p_tenant_id,p_branch_id,v_batch.medicine_id,v_batch.id,'customer_return',v_qty,'pharmacy_return',v_id,auth.uid());
    end if;
   else
+   if v_batch.supplier_id is distinct from p_supplier_id then raise exception 'Selected batch was not received from this supplier'; end if;
    if v_qty>v_batch.quantity_on_hand then raise exception 'Supplier return exceeds available batch stock'; end if;
    update public.medicine_batches set quantity_on_hand=quantity_on_hand-v_qty where id=v_batch.id;
    insert into public.pharmacy_stock_movements(tenant_id,branch_id,medicine_id,batch_id,movement_type,quantity_delta,reference_type,reference_id,actor_user_id)
