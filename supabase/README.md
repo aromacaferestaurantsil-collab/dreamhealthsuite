@@ -83,3 +83,20 @@ Never expose the Supabase service-role key to browser code.
 - Browser-based review is the interim validation path. Docker Desktop will be used later, after the feature build is complete, for local isolated database replay and authenticated integration testing.
 - No other project has been paused. FlatSync may be considered for a temporary pause only if a concrete capacity or dependency conflict arises; no project has been stopped or altered as part of this decision.
 - PharmaSuite catalogue, supplier register and branch-scoped batch inventory have now been migrated from Apper SDK calls to Supabase queries/inserts. Browser runtime validation remains pending.
+
+
+## PharmaSuite workflow implementation (2026-11-20)
+
+- `pharmacy_create_purchase_order` creates a supplier-linked order and its item rows in one transaction; order totals and tax are calculated server-side.
+- `pharmacy_receive_purchase_item` posts partial or complete goods receipts against an open order, validates outstanding quantities and expiry, creates the branch batch, and writes the stock movement atomically.
+- `pharmacy_adjust_stock` locks the batch, prevents negative stock, requires a reason, and records the signed movement and audit event.
+- `pharmacy_process_return` records customer and supplier returns, validates customer returns against original sold batch quantities including prior returns, checks supplier/batch ownership, updates stock when appropriate, and records stock movements.
+- `pharmacy_checkout_v2` adds a unique idempotency key and explicit `paid`/`pending` payment status to the transactional FEFO POS checkout. The POS currently submits `paid` only after the cashier explicitly confirms receipt of payment.
+- Added `/pharmacy-operations` for purchase orders, goods receipt, stock adjustment and returns; existing `/pharmacy/pos` uses the v2 checkout RPC.
+
+Important limitations and validation gates:
+- The first browser form currently creates one purchase-order line and posts one return line per transaction; the database RPCs accept JSON arrays and can support multi-line transactions, but the UI needs a multi-line editor before considering the purchasing/returns experience complete.
+- Return records calculate and store return value, but do not issue a cash/UPI refund or reconcile supplier credit notes/payables. Those require a dedicated payment/refund and supplier-ledger workflow.
+- POS payment confirmation is a cashier attestation, not a payment-gateway verification. Credit/partial tender collection, split tenders, voids, refunds and cash drawer reconciliation are not yet implemented.
+- The migration is committed but **not applied to the live Supabase project**. Do not run it against production. It must be replayed only after the baseline is reconstructed in the later isolated Docker phase.
+- No authenticated browser workflow test or successful build has yet been observed for these changes. Treat this as committed implementation, not tested or production-ready.
