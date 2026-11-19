@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 export const route = { path: '/pharmacy/pos', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'ShoppingCart', label: 'POS', section: 'PharmaSuite', order: 11, profiles: ['Admin_c', 'Pharmacist'] };
+export const nav = { icon: 'ShoppingCart', label: 'Selling medicines to patients', section: 'PharmaSuite · Pharmacy POS', order: 11, profiles: ['Admin_c', 'Pharmacist'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
@@ -74,7 +74,7 @@ export default function PharmacyPOS() {
 
   if(!tenantId) return <Card><CardContent className="p-6">No active workspace. Create or join a tenant before using Pharmacy POS.</CardContent></Card>;
   return <div className="mx-auto max-w-7xl space-y-5">
-    <section className="rounded-2xl bg-primary px-6 py-6 text-primary-foreground"><div className="text-xs font-bold uppercase tracking-widest opacity-80">PharmaSuite · Supabase</div><h1 className="mt-2 text-3xl font-black">Pharmacy POS</h1><p className="mt-2 text-sm opacity-85">Tenant-scoped stock lookup and atomic FEFO checkout.</p></section>
+    <section className="rounded-2xl bg-primary px-6 py-6 text-primary-foreground"><div className="text-xs font-bold uppercase tracking-widest opacity-80">PharmaSuite · Supabase</div><h1 className="mt-2 text-3xl font-black">Sell medicines to patients</h1><p className="mt-2 text-sm opacity-85">Patient counter sales with batch-aware FEFO checkout. Expired stock is never eligible for sale.</p></section>
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
       <Card><CardHeader><CardTitle>Medicine catalogue</CardTitle></CardHeader><CardContent className="space-y-3">
         <select aria-label="Branch" value={branchId} onChange={e=>{setBranchId(e.target.value);setCart([]);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>

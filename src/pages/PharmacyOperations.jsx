@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {useAuth} from '@/layouts/RootLayout';import {requireSupabase} from '@/lib/supabase';
 import {pharmacyCreatePurchaseOrder,pharmacyReceivePurchaseItem,pharmacyAdjustStock,pharmacyProcessReturn} from '@/services/healthsuite';
 import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';import {Button} from '@/components/ui/button';import {Input} from '@/components/ui/input';import {Label} from '@/components/ui/label';import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';import {Tabs,TabsContent,TabsList,TabsTrigger} from '@/components/ui/tabs';import {toast} from 'sonner';
-export const route={path:'/pharmacy-operations',layout:'owner',access:'authenticated'};export const nav={icon:'ClipboardList',label:'Operations',section:'PharmaSuite',order:12,profiles:['Admin_c','Manager','Pharmacist']};
+export const route={path:'/pharmacy-operations',layout:'owner',access:'authenticated'};export const nav={icon:'ClipboardList',label:'Operations',section:'PharmaSuite · Pharmacy Operations',order:12,profiles:['Admin_c','Manager','Pharmacist']};
 const today=()=>new Date().toISOString().slice(0,10);const Field=({label,children})=><div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 export default function PharmacyOperations(){
  const {activeTenant}=useAuth();const tenantId=activeTenant?.tenant_id;const [branch,setBranch]=useState(activeTenant?.branch_id||'');const [branches,Sb]=useState([]),[suppliers,Ss]=useState([]),[meds,Sm]=useState([]),[batches,Sbatches]=useState([]),[orders,So]=useState([]),[items,Si]=useState([]),[busy,Sbusy]=useState(false);
