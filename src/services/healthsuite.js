@@ -44,3 +44,20 @@ export async function transitionCareJob(jobId,newStatus,notes=null,location=null
   const {error}=await requireSupabase().rpc('transition_care_job',{p_job_id:jobId,p_new_status:newStatus,p_notes:notes,p_location:location});
   if(error) throw error;
 }
+
+export async function pharmacyCreatePurchaseOrder({tenantId,branchId,supplierId,orderNumber,orderDate,expectedDate,items}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_create_purchase_order',{p_tenant_id:tenantId,p_branch_id:branchId,p_supplier_id:supplierId,p_order_number:orderNumber,p_order_date:orderDate,p_expected_date:expectedDate||null,p_items:items});
+ if(error) throw error; return data;
+}
+export async function pharmacyReceivePurchaseItem({tenantId,orderId,itemId,quantity,batchNumber,expiryDate,mrp,sellingRate}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_receive_purchase_item',{p_tenant_id:tenantId,p_order_id:orderId,p_item_id:itemId,p_quantity:quantity,p_batch_number:batchNumber,p_expiry_date:expiryDate,p_mrp:mrp,p_selling_rate:sellingRate});
+ if(error) throw error; return data;
+}
+export async function pharmacyAdjustStock({tenantId,branchId,batchId,quantityDelta,reason}) {
+ const {error}=await requireSupabase().rpc('pharmacy_adjust_stock',{p_tenant_id:tenantId,p_branch_id:branchId,p_batch_id:batchId,p_quantity_delta:quantityDelta,p_reason:reason});
+ if(error) throw error;
+}
+export async function pharmacyProcessReturn({tenantId,branchId,returnNumber,returnType,reason,saleId,supplierId,items}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_process_return',{p_tenant_id:tenantId,p_branch_id:branchId,p_return_number:returnNumber,p_return_type:returnType,p_reason:reason,p_sale_id:saleId||null,p_supplier_id:supplierId||null,p_items:items});
+ if(error) throw error; return data;
+}
