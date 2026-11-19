@@ -30,7 +30,11 @@ export default function AuthPage({ mode }) {
         const { data, error: authError } = await client.auth.signUp({
           email: email.trim().toLowerCase(),
           password,
-          options: { data: { full_name: fullName.trim() } },
+          options: {
+            data: { full_name: fullName.trim() },
+            // Return confirmation links to the deployed web app, not a localhost default.
+            emailRedirectTo: `${window.location.origin}/`,
+          },
         });
         if (authError) throw authError;
         if (data.session && data.user) {
