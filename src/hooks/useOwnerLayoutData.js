@@ -15,12 +15,15 @@ const footerPages = Object.entries(pageMods)
   .filter(([, mod]) => mod.route && mod.route.layout === 'owner' && mod.route.access !== 'public' && !mod.route.path.includes(':') && !navPaths.has(mod.route.path))
   .map(([, mod]) => ({ ...mod.route, to: mod.route.path, href: mod.route.path }));
 
+// PharmaSuite is one parent navigation section. Its child pages keep their own
+// route, role visibility and page-specific logic; this only changes navigation.
+const sectionFor = (item) => item.section?.startsWith('PharmaSuite') ? 'PharmaSuite' : (item.section ?? null);
+
 // The single data source for OwnerLayout: auth, nav discovery, profile filtering,
 // section grouping, footer pages, nav count badges, and the post-login home route.
 export function useOwnerLayoutData() {
   const { logout, user } = useAuth();
 
-  // "Home" for a signed-in user is their profile's post-login route, matching AuthPage.
   const homeRoute = useMemo(() => {
     const matched = AUTH_PROFILES?.find((p) => p.name === user?.profile);
     return matched?.redirectAfterAuth ?? GENERIC_AUTH?.redirectAfterAuth ?? '/';
@@ -35,10 +38,10 @@ export function useOwnerLayoutData() {
     const groups = [];
     const byLabel = new Map();
     for (const item of navItems) {
-      const groupLabel = item.section ?? null;
+      const groupLabel = sectionFor(item);
       let group = groupLabel != null ? byLabel.get(groupLabel) : null;
       if (!group) {
-        group = { label: groupLabel, items: [] };
+        group = { label: groupLabel, items: [], icon: groupLabel === 'PharmaSuite' ? 'Pill' : null };
         groups.push(group);
         if (groupLabel != null) byLabel.set(groupLabel, group);
       }
