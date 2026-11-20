@@ -1,16 +1,16 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { Suspense } from 'react';
+import { Suspense, lazy } from 'react';
 import RootLayout from '@/layouts/RootLayout';
 import OwnerLayout from '@/layouts/OwnerLayout';
 import PublicLayout from '@/layouts/PublicLayout';
 import AppLoader from '@/components/AppLoader';
 import PageSkeleton from '@/components/PageSkeleton';
 
-// Route metadata is discovered eagerly for navigation and access filtering.
-// The owner layout already eagerly imports these page modules for metadata,
-// so wrapping the same modules in lazy() creates ineffective dynamic imports.
+// Route chunk fallbacks: app pages show a neutral page skeleton in the content area; auth pages
+// keep the boot loader so first open reads as one continuous state.
 const PageLoader = () => <PageSkeleton />;
 const AuthLoader = () => <AppLoader />;
+
 const wrap = (Component) => (
   <Suspense fallback={<PageLoader />}><Component /></Suspense>
 );
@@ -18,15 +18,16 @@ const authWrap = (Component) => (
   <Suspense fallback={<AuthLoader />}><Component /></Suspense>
 );
 
+// Auto-discover: eager modules for route metadata + lazy loaders for code-splitting
 const pageMods = import.meta.glob('/src/pages/**/*.jsx', { eager: true });
-const pageComponent = (path) => pageMods[path]?.default;
-const NotFoundPage = pageComponent('/src/pages/NotFound.jsx');
+const pageLoaders = import.meta.glob('/src/pages/**/*.jsx');
+const NotFoundPage = lazy(() => import('@/pages/NotFound'));
 
 const discoveredRoutes = Object.entries(pageMods)
-  .filter(([, mod]) => mod.route && mod.default)
-  .map(([, mod]) => ({
+  .filter(([, mod]) => mod.route)
+  .map(([filePath, mod]) => ({
     ...mod.route,
-    _component: mod.default,
+    _component: lazy(pageLoaders[filePath]),
   }));
 
 function buildDiscoveredRoute(r) {
@@ -40,15 +41,16 @@ function buildDiscoveredRoute(r) {
   return config;
 }
 
-const AuthPage = pageComponent('/src/pages/auth/AuthPage.jsx');
-const AuthCallback = pageComponent('/src/pages/auth/Callback.jsx');
-const AuthError = pageComponent('/src/pages/auth/ErrorPage.jsx');
-const AuthAccessDenied = pageComponent('/src/pages/auth/AccessDenied.jsx');
-const AuthResetPassword = pageComponent('/src/pages/auth/ResetPassword.jsx');
-const AuthForgotPassword = pageComponent('/src/pages/auth/ForgotPassword.jsx');
-const AuthPromptPassword = pageComponent('/src/pages/auth/PromptPassword.jsx');
-const AuthEmailVerification = pageComponent('/src/pages/auth/EmailVerification.jsx');
-const AuthAcceptInvitation = pageComponent('/src/pages/auth/AcceptInvitation.jsx');
+// Auth routes (frozen pages — no route export, handled separately)
+const AuthPage = lazy(() => import('@/pages/auth/AuthPage'));
+const AuthCallback = lazy(() => import('@/pages/auth/Callback'));
+const AuthError = lazy(() => import('@/pages/auth/ErrorPage'));
+const AuthAccessDenied = lazy(() => import('@/pages/auth/AccessDenied'));
+const AuthResetPassword = lazy(() => import('@/pages/auth/ResetPassword'));
+const AuthForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'));
+const AuthPromptPassword = lazy(() => import('@/pages/auth/PromptPassword'));
+const AuthEmailVerification = lazy(() => import('@/pages/auth/EmailVerification'));
+const AuthAcceptInvitation = lazy(() => import('@/pages/auth/AcceptInvitation'));
 
 function buildAuthRoutes() {
   const routes = [];
