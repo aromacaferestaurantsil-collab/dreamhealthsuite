@@ -16,7 +16,7 @@ export const nav = { icon: 'Pill', label: 'Inventory', section: 'PharmaSuite · 
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const today = () => new Date().toISOString().slice(0,10);
-const blankMedicine = () => ({sku:'',name:'',generic_name:'',brand:'',strength:'',dosage_form:'Tablet',unit:'unit',hsn_code:'',gst_rate:'0',reorder_level:'10',prescription_required:false,status:'active'});
+const blankMedicine = () => ({sku:'',name:'',generic_name:'',brand:'',strength:'',dosage_form:'Tablet',unit:'unit',hsn_code:'',gst_rate:'0',reorder_level:'10',units_per_pack:'1',allow_loose_sale:true,prescription_required:false,status:'active'});
 const blankSupplier = () => ({name:'',contact_person:'',phone:'',email:'',gstin:'',address:'',status:'active'});
 const blankBatch = () => ({medicine_id:'',supplier_id:'',batch_number:'',expiry_date:'',quantity_on_hand:'',purchase_rate:'',mrp:'',selling_rate:''});
 
@@ -46,7 +46,7 @@ export default function Pharmacy() {
       const db=requireSupabase();
       const [b,m,sup] = await Promise.all([
         db.from('branches').select('id,name,branch_code,status').eq('tenant_id',tenantId).eq('status','active').order('name'),
-        db.from('medicine_catalogue').select('id,sku,name,generic_name,brand,strength,dosage_form,unit,hsn_code,gst_rate,reorder_level,prescription_required,status').eq('tenant_id',tenantId).order('name').limit(500),
+        db.from('medicine_catalogue').select('id,sku,name,generic_name,brand,strength,dosage_form,unit,hsn_code,gst_rate,reorder_level,units_per_pack,allow_loose_sale,prescription_required,status').eq('tenant_id',tenantId).order('name').limit(500),
         db.from('pharmacy_suppliers').select('id,name,contact_person,phone,email,gstin,address,status').eq('tenant_id',tenantId).order('name').limit(500),
       ]);
       if(b.error) throw b.error; if(m.error) throw m.error; if(sup.error) throw sup.error;
@@ -83,7 +83,7 @@ export default function Pharmacy() {
     if(!medicineForm.name.trim()) return toast.error('Medicine name is required');
     setSaving(true);
     try {
-      const payload={...medicineForm,tenant_id:tenantId,gst_rate:Number(medicineForm.gst_rate||0),reorder_level:Number(medicineForm.reorder_level||0)};
+      const payload={...medicineForm,tenant_id:tenantId,gst_rate:Number(medicineForm.gst_rate||0),reorder_level:Number(medicineForm.reorder_level||0),units_per_pack:Number(medicineForm.units_per_pack||1),allow_loose_sale:Boolean(medicineForm.allow_loose_sale)};
       const {error}=await requireSupabase().from('medicine_catalogue').insert(payload);
       if(error) throw error;
       toast.success('Medicine added');setMedicineOpen(false);setMedicineForm(blankMedicine());await load();
@@ -135,7 +135,7 @@ export default function Pharmacy() {
           <Field label="Generic / salt"><Input value={medicineForm.generic_name} onChange={e=>setMedicineForm({...medicineForm,generic_name:e.target.value})}/></Field><Field label="Brand"><Input value={medicineForm.brand} onChange={e=>setMedicineForm({...medicineForm,brand:e.target.value})}/></Field>
           <Field label="Strength"><Input value={medicineForm.strength} onChange={e=>setMedicineForm({...medicineForm,strength:e.target.value})} placeholder="e.g. 500 mg"/></Field><Field label="Dosage form"><Select value={medicineForm.dosage_form} onValueChange={v=>setMedicineForm({...medicineForm,dosage_form:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{['Tablet','Capsule','Syrup','Suspension','Injection','Cream','Ointment','Drops','Inhaler','Other'].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></Field>
           <Field label="Unit"><Input value={medicineForm.unit} onChange={e=>setMedicineForm({...medicineForm,unit:e.target.value})}/></Field><Field label="HSN code"><Input value={medicineForm.hsn_code} onChange={e=>setMedicineForm({...medicineForm,hsn_code:e.target.value})}/></Field>
-          <Field label="GST rate (%)"><Input type="number" min="0" max="100" step="0.01" value={medicineForm.gst_rate} onChange={e=>setMedicineForm({...medicineForm,gst_rate:e.target.value})}/></Field><Field label="Reorder level"><Input type="number" min="0" value={medicineForm.reorder_level} onChange={e=>setMedicineForm({...medicineForm,reorder_level:e.target.value})}/></Field>
+          <Field label="GST rate (%)"><Input type="number" min="0" max="100" step="0.01" value={medicineForm.gst_rate} onChange={e=>setMedicineForm({...medicineForm,gst_rate:e.target.value})}/></Field><Field label="Reorder level"><Input type="number" min="0" value={medicineForm.reorder_level} onChange={e=>setMedicineForm({...medicineForm,reorder_level:e.target.value})}/></Field><Field label="Units per pack"><Input type="number" min="0.001" step="0.001" value={medicineForm.units_per_pack} onChange={e=>setMedicineForm({...medicineForm,units_per_pack:e.target.value})}/></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={medicineForm.allow_loose_sale} onChange={e=>setMedicineForm({...medicineForm,allow_loose_sale:e.target.checked})}/> Allow loose-unit sales</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={medicineForm.prescription_required} onChange={e=>setMedicineForm({...medicineForm,prescription_required:e.target.checked})}/> Prescription required</label>
           <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setMedicineOpen(false)}>Cancel</Button><Button disabled={saving}>{saving?'Saving…':'Save medicine'}</Button></div>
         </form></DialogContent></Dialog>
