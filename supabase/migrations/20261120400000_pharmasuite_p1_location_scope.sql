@@ -1,0 +1,3 @@
+alter table public.pharmacy_stock_locations add constraint pharmacy_stock_locations_tenant_branch_id_uniq unique(tenant_id,branch_id,id);
+alter table public.medicine_batches drop constraint if exists medicine_batches_location_scope_fkey;
+alter table public.medicine_batches add constraint medicine_batches_location_scope_fkey foreign key(tenant_id,branch_id,location_id) references public.pharmacy_stock_locations(tenant_id,branch_id,id);
