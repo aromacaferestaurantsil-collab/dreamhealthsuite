@@ -1,6 +1,6 @@
 import OperationalModule from './OperationalModule';
 export const route = { path: '/patients', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'HeartPulse', label: 'PatientSuite', order: 13, profiles: null };
+export const nav = { icon: 'HeartPulse', label: 'Patient Register', order: 13, profiles: ['VendorOwner','VendorAdmin','Manager','Receptionist'] };
 const config = {
  title: 'PatientSuite', audience: 'Unified patient identity and portal foundation',
  description: 'Maintain a unified patient register and purpose-specific consent records shared across pharmacy, laboratory and clinic workflows.',
