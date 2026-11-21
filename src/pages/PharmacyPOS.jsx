@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { pharmacyCheckoutV2 } from '@/services/healthsuite';
@@ -26,6 +26,7 @@ export default function PharmacyPOS() {
   const [paymentConfirmed,setPaymentConfirmed] = useState(false);
   const [loading,setLoading] = useState(false);
   const [saving,setSaving] = useState(false);
+  const inventoryRequest = useRef(0);
 
   async function load() {
     if(!tenantId) return;
@@ -48,14 +49,16 @@ export default function PharmacyPOS() {
   useEffect(()=>{if(!tenantId||!branchId)return;loadInventory();},[tenantId,branchId]);
 
   async function loadInventory(){
+    const request=++inventoryRequest.current;
     try{
       const db=requireSupabase();
       const [s,h]=await Promise.all([
         db.from('medicine_batches').select('id,medicine_id,batch_number,expiry_date,quantity_on_hand,selling_rate,mrp,branch_id,received_at').eq('tenant_id',tenantId).eq('branch_id',branchId).gt('quantity_on_hand',0).order('expiry_date').order('received_at').limit(1500),
         db.from('pharmacy_stock_holds').select('batch_id,held_quantity,hold_status').eq('tenant_id',tenantId).eq('branch_id',branchId).eq('hold_status','active'),
       ]);
-      if(s.error)throw s.error;if(h.error)throw h.error;setStock(s.data??[]);setHolds(h.data??[]);
-    }catch(e){toast.error(e.message||'Unable to load branch inventory');setStock([]);setHolds([]);}
+      if(s.error)throw s.error;if(h.error)throw h.error;
+      if(request===inventoryRequest.current){setStock(s.data??[]);setHolds(h.data??[]);}
+    }catch(e){if(request===inventoryRequest.current){toast.error(e.message||'Unable to load branch inventory');setStock([]);setHolds([]);}}
   }
   const heldFor = batchId => holds.filter(h=>h.batch_id===batchId).reduce((n,h)=>n+Number(h.held_quantity||0),0);
   const availableFor = medicineId => stock.filter(b=>b.medicine_id===medicineId && b.expiry_date>=new Date().toISOString().slice(0,10)).map(b=>({...b,available:Math.max(0,Number(b.quantity_on_hand)-heldFor(b.id))})).filter(b=>b.available>0);
@@ -93,7 +96,7 @@ export default function PharmacyPOS() {
     <section className="rounded-2xl bg-primary px-6 py-6 text-primary-foreground"><div className="text-xs font-bold uppercase tracking-widest opacity-80">PharmaSuite · Supabase</div><h1 className="mt-2 text-3xl font-black">Sale</h1><p className="mt-2 text-sm opacity-85">Record medicine sales with batch-aware FEFO checkout. Expired stock is never eligible for sale.</p></section>
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
       <Card><CardHeader><CardTitle>Medicine catalogue</CardTitle></CardHeader><CardContent className="space-y-3">
-        <select aria-label="Branch" value={branchId} onChange={e=>{setBranchId(e.target.value);setCart([]);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>
+        <select aria-label="Branch" value={branchId} onChange={e=>{inventoryRequest.current++;setStock([]);setHolds([]);setBranchId(e.target.value);setCart([]);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>
         <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search medicine, brand or strength" />
         {loading?<p className="text-sm text-muted-foreground">Loading inventory…</p>:<div className="max-h-[560px] space-y-2 overflow-auto">{filtered.map(m=>{const available=availableFor(m.id).reduce((n,b)=>n+b.available,0);return <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><div className="font-semibold">{m.name} {m.strength}</div><div className="text-xs text-muted-foreground">{m.brand??m.generic_name??m.dosage_form??'Medicine'} · Stock {available}</div></div><Button size="sm" disabled={!available || !branchId} onClick={()=>add(m)}>Add</Button></div>;})}{!filtered.length&&<p className="text-sm text-muted-foreground">No medicines found.</p>}</div>}
       </CardContent></Card>
