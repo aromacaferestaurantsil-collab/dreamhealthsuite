@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import {
@@ -44,9 +44,11 @@ export default function PharmacyWorkflows(){
  const [referral,setReferral]=useState({patient:'',code:''});
  const [reviewNotes,setReviewNotes]=useState({});
  const [photoSearch,setPhotoSearch]=useState(''); const [photoResults,setPhotoResults]=useState([]); const [photoSearching,setPhotoSearching]=useState(false);
+ const loadRequest=useRef(0);
 
  async function load(){
-  if(!tenantId)return; setBusy(true);
+  if(!tenantId){setBranches([]);setOrders([]);setOrderItems([]);setSales([]);setSaleItems([]);setReturns([]);setReturnItems([]);setPurchaseOrders([]);setPurchaseItems([]);setExpenses([]);setBatches([]);setMedicines([]);setHolds([]);setSupplierBalances([]);setSuppliers([]);setControlled([]);setSuggestions([]);setReferrals([]);setPatients([]);setBusy(false);return;}
+  const request=++loadRequest.current; setBusy(true);
   try{
    const [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti,sup]=await Promise.all([
     db.from('branches').select('id,name').eq('tenant_id',tenantId).eq('status','active').order('name'),
@@ -70,14 +72,15 @@ export default function PharmacyWorkflows(){
     db.from('pharmacy_suppliers').select('id,name,status').eq('tenant_id',tenantId).order('name').limit(500)
    ]);
    for(const x of [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti,sup]) if(x.error)throw x.error;
+   if(request!==loadRequest.current)return;
    setBranches(b.data||[]);setBranch(x=>x||activeTenant?.branch_id||b.data?.[0]?.id||'');
    setOrders(o.data||[]);setOrderItems(oi.data||[]);setPurchaseOrders(po.data||[]);setPurchaseItems(pi.data||[]);
    setExpenses(e.data||[]);setBatches(ba.data||[]);setMedicines(m.data||[]);setHolds(h.data||[]);
    setSupplierBalances(sb.data||[]);setSuppliers(sup.data||[]);setControlled(cd.data||[]);setSuggestions(ph.data||[]);setReferrals(rf.data||[]);setPatients(pt.data||[]);
    setSales(sa.data||[]);setSaleItems(sai.data||[]);setReturns(ret.data||[]);setReturnItems(reti.data||[]);
-  }catch(err){toast.error(err.message||'Could not load PharmaSuite workflows')}finally{setBusy(false)}
+  }catch(err){if(request===loadRequest.current)toast.error(err.message||'Could not load PharmaSuite workflows')}finally{if(request===loadRequest.current)setBusy(false)}
  }
- useEffect(()=>{setBranch(activeTenant?.branch_id||'')},[tenantId,activeTenant?.branch_id]);
+ useEffect(()=>{loadRequest.current++;setBranch(activeTenant?.branch_id||'');setBranches([]);setOrders([]);setOrderItems([]);setSales([]);setSaleItems([]);setReturns([]);setReturnItems([]);setPurchaseOrders([]);setPurchaseItems([]);setExpenses([]);setBatches([]);setMedicines([]);setHolds([]);setSupplierBalances([]);setSuppliers([]);setControlled([]);setSuggestions([]);setReferrals([]);setPatients([]);setPhotoResults([]);setReviewNotes({})},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId,branch]);
  const scopedOrders=orders.filter(x=>x.branch_id===branch);
  const scopedSales=sales.filter(x=>x.branch_id===branch); const scopedReturns=returns.filter(x=>x.branch_id===branch); const scopedSuppliers=suppliers.filter(x=>x.status==='active');
