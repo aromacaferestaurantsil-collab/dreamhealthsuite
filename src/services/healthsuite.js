@@ -49,6 +49,17 @@ export async function pharmacyCreatePurchaseOrder({tenantId,branchId,supplierId,
  const {data,error}=await requireSupabase().rpc('pharmacy_create_purchase_order',{p_tenant_id:tenantId,p_branch_id:branchId,p_supplier_id:supplierId,p_order_number:orderNumber,p_order_date:orderDate,p_expected_date:expectedDate||null,p_items:items});
  if(error) throw error; return data;
 }
+
+export async function pharmacyReceiveOpeningBatch({tenantId,branchId,medicineId,supplierId,batchNumber,expiryDate,quantity,purchaseRate,mrp,sellingRate}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_receive_opening_batch',{
+  p_tenant_id:tenantId,p_branch_id:branchId,p_medicine_id:medicineId,p_supplier_id:supplierId||null,
+  p_batch_number:batchNumber,p_expiry_date:expiryDate,p_quantity:quantity,
+  p_purchase_rate:purchaseRate,p_mrp:mrp,p_selling_rate:sellingRate,
+ });
+ if(error) throw error;
+ return data;
+}
+
 export async function pharmacyReceivePurchaseItem({tenantId,orderId,itemId,quantity,batchNumber,expiryDate,mrp,sellingRate}) {
  const {data,error}=await requireSupabase().rpc('pharmacy_receive_purchase_item',{p_tenant_id:tenantId,p_order_id:orderId,p_item_id:itemId,p_quantity:quantity,p_batch_number:batchNumber,p_expiry_date:expiryDate,p_mrp:mrp,p_selling_rate:sellingRate});
  if(error) throw error; return data;
