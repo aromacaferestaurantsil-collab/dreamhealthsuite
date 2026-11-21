@@ -15,7 +15,7 @@ const fmtDate = value => value ? new Date(value).toLocaleDateString('en-IN') : '
 const today = () => new Date().toISOString().slice(0,10);
 const monthStart = () => today().slice(0,8) + '01';
 const sum = (rows,key) => rows.reduce((n,r)=>n+Number(r[key]||0),0);
-const nextDay = value => { const d=new Date(value+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); };
+const nextDay = value => { const [y,m,d]=value.split('-').map(Number); return new Date(Date.UTC(y,m-1,d+1)).toISOString().slice(0,10); };
 const startTs = value => value+'T00:00:00+05:30';
 const endTs = value => nextDay(value)+'T00:00:00+05:30';
 
@@ -57,6 +57,7 @@ export default function Analytics() {
       if (!alive) return;
       const [b,sales,purchases,expenses,expensePayments,supplierPayments,cashbook,labs,appointments,jobs] = results;
       setBranches(b.data||[]);
+      if (branch !== 'all' && !(b.data||[]).some(x=>x.id===branch)) setBranch(activeTenant?.branch_id || 'all');
       const expenseIds = new Set((expenses.data||[]).map(x=>x.id));
       setData({sales:sales.data||[],purchases:purchases.data||[],expenses:expenses.data||[],expensePayments:(expensePayments.data||[]).filter(x=>expenseIds.has(x.expense_id)),supplierPayments:supplierPayments.data||[],cashbook:cashbook.data||[],labs:labs.data||[],appointments:appointments.data||[],jobs:jobs.data||[]});
     }).catch(e=>{if(alive)setError(e.message||'Unable to load reports');})
