@@ -19,7 +19,7 @@ export default function DoctorPortal(){
   setLoading(true);setError('');
   try{
    const db=requireSupabase(),{data:{user},error:userError}=await db.auth.getUser();if(userError)throw userError;if(!user)throw new Error('Sign in with your doctor account.');
-   const {data:rows,error:doctorError}=await db.from('doctor_profiles').select('id,tenant_id,doctor_code,full_name,specialty,qualifications,registration_number,consultation_fee,status').eq('user_id',user.id).eq('status','active');
+   const {data:rows,error:doctorError}=await db.rpc('doctor_get_my_profile');
    if(doctorError)throw doctorError;
    if(!rows?.length){setDoctor(null);return;}
    if(rows.length>1){throw new Error('This account is linked to multiple doctor profiles. Ask the platform administrator to reconcile your doctor identity.');}
