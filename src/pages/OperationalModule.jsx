@@ -96,6 +96,17 @@ export default function OperationalModule({ config }) {
     setSaving(true);
     try {
       const client = requireSupabase();
+      if (assignmentMode && entity.assignmentRpc && editingId) {
+        const assignee = values.assigned_to;
+        const eligible = (lookupRows.assigned_to || []).some(item => item.user_id === assignee && item.role === 'care_worker' && item.status === 'active');
+        if (!assignee || !eligible) throw new Error('Choose an active care worker from this workspace');
+        const {error}=await client.rpc(entity.assignmentRpc,{
+          p_job_id:editingId,p_assignee_user_id:assignee,p_notes:'Assigned or reassigned from Care Connect workspace'
+        });
+        if(error)throw error;
+        toast.success('Job assigned to selected care worker');
+        setValues({});setEditingId('');setAssignmentMode(false);await load();return;
+      }
       const { data: auth } = await client.auth.getUser();
       const payload = { tenant_id: activeTenant.tenant_id };
       if (entity.branchScoped && activeTenant.branch_id) payload.branch_id = activeTenant.branch_id;
@@ -108,25 +119,36 @@ export default function OperationalModule({ config }) {
           : field.type === 'json' ? (typeof value === 'string' ? { text: value } : value)
           : value;
       }
-      const missing = entity.fields.find(f => f.required && (payload[f.name] === undefined || payload[f.name] === null || payload[f.name] === ''));
+      const fieldsForValidation = entity.fields.filter(f => !(editingId && f.editable === false));
+      const missing = fieldsForValidation.find(f => f.required && (payload[f.name] === undefined || payload[f.name] === null || payload[f.name] === ''));
       if (missing) throw new Error(missing.label + ' is required');
       for (const lookup of (entity.lookups || (entity.lookup ? [entity.lookup] : []))) {
+        if (editingId && lookup.editable === false) continue;
         const lookupValue = payload[lookup.field];
         const records = lookupRows[lookup.field] || [];
         if (lookup.required !== false && !records.some(item => (lookup.valueField ? item[lookup.valueField] : item.id) === lookupValue)) throw new Error('Choose a valid ' + (lookup.label || lookup.field) + ' from this workspace');
         if (lookupValue && !records.some(item => (lookup.valueField ? item[lookup.valueField] : item.id) === lookupValue)) throw new Error('Selected ' + (lookup.label || lookup.field) + ' is outside the active workspace');
       }
+      if (entity.createRpc === 'create_doctor_appointment' && !editingId) {
+        if (!payload.starts_at || !payload.ends_at || new Date(payload.ends_at) <= new Date(payload.starts_at)) throw new Error('Appointment end time must be after its start time');
+        const {error} = await client.rpc(entity.createRpc,{
+          p_tenant_id:activeTenant.tenant_id,
+          p_branch_id:payload.branch_id ?? activeTenant.branch_id,
+          p_patient_id:payload.patient_id,
+          p_doctor_id:payload.doctor_id,
+          p_appointment_number:payload.appointment_number,
+          p_starts_at:new Date(payload.starts_at).toISOString(),
+          p_ends_at:new Date(payload.ends_at).toISOString(),
+          p_reason:payload.reason ?? null
+        });
+        if(error)throw error;
+        toast.success('Appointment created and schedule checked');
+        setValues({});await load();return;
+      }
       if (entity.table === 'patient_consents' && payload.granted === false && !payload.withdrawn_at) {
         payload.withdrawn_at = new Date().toISOString();
       }
-      if (entity.assignmentRpc && editingId && assignmentMode) {
-        if (!payload.assigned_to) throw new Error('Choose a care worker before assigning this job');
-        const {error:assignError}=await client.rpc(entity.assignmentRpc,{p_job_id:editingId,p_assignee_user_id:payload.assigned_to,p_notes:'Assigned or reassigned from Care Connect workspace'});
-        if(assignError)throw assignError;
-        toast.success('Job assigned to selected care worker');
-        setValues({});setEditingId('');await load();return;
-      }
-      let request = client.from(entity.table);
+      const request = client.from(entity.table);
       if (editingId) {
         const { error: updateError } = await request.update(payload).eq('tenant_id', activeTenant.tenant_id).eq('id', editingId);
         if (updateError) throw updateError;
@@ -147,6 +169,7 @@ export default function OperationalModule({ config }) {
   function startEdit(row) {
     const next = {};
     for (const field of entity.fields) {
+      if (field.editable === false) continue;
       const value = row[field.name];
       next[field.name] = value == null ? '' : field.type === 'boolean' ? String(Boolean(value)) : value;
     }
@@ -156,20 +179,6 @@ export default function OperationalModule({ config }) {
   }
   function cancelEdit() { setEditingId(''); setAssignmentMode(false); setValues({}); }
   function startAssign(row) { setEditingId(row.id); setAssignmentMode(true); setValues({assigned_to:row.assigned_to || ''}); }
-  async function assignRecord(row, lookupField) {
-    if (!entity.assignmentRpc || !lookupField) return;
-    const assignee = values[lookupField];
-    if (!assignee) return toast.error('Select an eligible employee first');
-    setSaving(true);
-    try {
-      const {error} = await requireSupabase().rpc(entity.assignmentRpc,{p_job_id:row.id,p_assignee_user_id:assignee,p_notes:'Assigned from Care Connect workspace'});
-      if(error) throw error;
-      toast.success('Job assigned to employee');
-      setValues({});
-      await load();
-    } catch(e) { toast.error(e.message || 'Unable to assign job'); }
-    finally { setSaving(false); }
-  }
   async function changeStatus(row, status) {
     if (!entity.statusField) return;
     setSaving(true);
@@ -203,7 +212,7 @@ export default function OperationalModule({ config }) {
       <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
         <Card><CardHeader><CardTitle>{assignmentMode ? 'Assign employee to job' : editingId ? 'Edit ' + entity.singular : entity.singular + ' entry'}</CardTitle></CardHeader><CardContent>
           <form className="space-y-3" onSubmit={createRecord}>
-            {entity.fields.filter(f => f.create !== false && (!assignmentMode || f.name === 'assigned_to')).map(field => <div key={field.name} className="space-y-1.5">
+            {entity.fields.filter(f => f.create !== false && (!assignmentMode || f.name === 'assigned_to') && (!editingId || f.editable !== false)).map(field => <div key={field.name} className="space-y-1.5">
               <Label>{field.label}{field.required ? ' *' : ''}</Label>
               {field.lookup ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{(lookupRows[field.name] || []).map(item => { const value = field.lookupValueField ? item[field.lookupValueField] : item.id; return <SelectItem key={value} value={value}>{item[field.lookupLabelField || 'name'] || item.full_name || item.name || value}{item.patient_code ? ' · ' + item.patient_code : item.service_code ? ' · ' + item.service_code : ''}</SelectItem>; })}</SelectContent></Select>
               : field.options ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{field.options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>
@@ -214,7 +223,7 @@ export default function OperationalModule({ config }) {
           </form>
         </CardContent></Card>
         <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>{entity.label}</CardTitle><div className="flex items-center gap-2"><Badge variant="secondary">{rows.length} records</Badge><Button size="sm" variant="outline" onClick={load}>Refresh</Button></div></div></CardHeader><CardContent>
-          {loading ? <p className="py-8 text-sm text-muted-foreground">Loading records…</p> : error ? <p className="py-6 text-sm text-destructive">{error}</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{columns.map(f => <th key={f.name} className="py-3 pr-3">{f.label}</th>)}<th className="py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{rows.map(row => <tr key={row.id}>{columns.map(f => <td key={f.name} className="max-w-56 truncate py-3 pr-3">{display(row[f.name])}</td>)}<td className="whitespace-nowrap py-3 text-right"><div className="flex justify-end gap-1">{entity.editable !== false&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startEdit(row)}>Edit</Button>}{entity.statusField&&entity.statusOptions?.map(option=>option!==row[entity.statusField]&&!(entity.statusRpc==='transition_care_job'&&['assigned','in_progress','completed'].includes(option))?<Button key={String(option)} size="sm" variant="ghost" disabled={saving} onClick={()=>changeStatus(row,option)}>{entity.statusField==='granted'&&option===false?'Withdraw':String(option)}</Button>:null)}{entity.assignmentRpc&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startAssign(row)}>Assign</Button>}</div></td></tr>)}</tbody></table>{!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">No records yet.</p>}</div>}
+          {loading ? <p className="py-8 text-sm text-muted-foreground">Loading records…</p> : error ? <p className="py-6 text-sm text-destructive">{error}</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{columns.map(f => <th key={f.name} className="py-3 pr-3">{f.label}</th>)}<th className="py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{rows.map(row => <tr key={row.id}>{columns.map(f => <td key={f.name} className="max-w-56 truncate py-3 pr-3">{display(row[f.name])}</td>)}<td className="whitespace-nowrap py-3 text-right"><div className="flex justify-end gap-1">{entity.editable !== false&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startEdit(row)}>Edit</Button>}{entity.statusField&&(entity.transitions?.[row[entity.statusField]]??entity.statusOptions??[]).map(option=>option!==row[entity.statusField]&&!(entity.statusRpc==='transition_care_job'&&['assigned','in_progress','completed'].includes(option))?<Button key={String(option)} size="sm" variant="ghost" disabled={saving} onClick={()=>changeStatus(row,option)}>{entity.statusField==='granted'&&option===false?'Withdraw':String(option)}</Button>:null)}{entity.assignmentRpc&&entity.assignmentStatuses?.includes(row[entity.statusField])&&['owner','admin','manager'].includes(activeTenant?.role)&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startAssign(row)}>Assign</Button>}</div></td></tr>)}</tbody></table>{!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">No records yet.</p>}</div>}
         </CardContent></Card>
       </div>
     </>}
