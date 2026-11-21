@@ -134,6 +134,20 @@ export default function OperationalModule({ config }) {
     setValues(next);
   }
   function cancelEdit() { setEditingId(''); setValues({}); }
+  async function assignRecord(row, lookupField) {
+    if (!entity.assignmentRpc || !lookupField) return;
+    const assignee = values[lookupField];
+    if (!assignee) return toast.error('Select an eligible employee first');
+    setSaving(true);
+    try {
+      const {error} = await requireSupabase().rpc(entity.assignmentRpc,{p_job_id:row.id,p_assignee_user_id:assignee,p_notes:'Assigned from Care Connect workspace'});
+      if(error) throw error;
+      toast.success('Job assigned to employee');
+      setValues({});
+      await load();
+    } catch(e) { toast.error(e.message || 'Unable to assign job'); }
+    finally { setSaving(false); }
+  }
   async function changeStatus(row, status) {
     if (!entity.statusField) return;
     setSaving(true);
@@ -178,7 +192,7 @@ export default function OperationalModule({ config }) {
           </form>
         </CardContent></Card>
         <Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><CardTitle>{entity.label}</CardTitle><div className="flex items-center gap-2"><Badge variant="secondary">{rows.length} records</Badge><Button size="sm" variant="outline" onClick={load}>Refresh</Button></div></div></CardHeader><CardContent>
-          {loading ? <p className="py-8 text-sm text-muted-foreground">Loading records…</p> : error ? <p className="py-6 text-sm text-destructive">{error}</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{columns.map(f => <th key={f.name} className="py-3 pr-3">{f.label}</th>)}<th className="py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{rows.map(row => <tr key={row.id}>{columns.map(f => <td key={f.name} className="max-w-56 truncate py-3 pr-3">{display(row[f.name])}</td>)}<td className="whitespace-nowrap py-3 text-right"><div className="flex justify-end gap-1">{entity.editable !== false&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startEdit(row)}>Edit</Button>}{entity.statusField&&entity.statusOptions?.map(option=>option!==row[entity.statusField]?<Button key={String(option)} size="sm" variant="ghost" disabled={saving} onClick={()=>changeStatus(row,option)}>{entity.statusField==='granted'&&option===false?'Withdraw':String(option)}</Button>:null)}</div></td></tr>)}</tbody></table>{!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">No records yet.</p>}</div>}
+          {loading ? <p className="py-8 text-sm text-muted-foreground">Loading records…</p> : error ? <p className="py-6 text-sm text-destructive">{error}</p> : <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{columns.map(f => <th key={f.name} className="py-3 pr-3">{f.label}</th>)}<th className="py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{rows.map(row => <tr key={row.id}>{columns.map(f => <td key={f.name} className="max-w-56 truncate py-3 pr-3">{display(row[f.name])}</td>)}<td className="whitespace-nowrap py-3 text-right"><div className="flex justify-end gap-1">{entity.editable !== false&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startEdit(row)}>Edit</Button>}{entity.statusField&&entity.statusOptions?.map(option=>option!==row[entity.statusField]&&!(entity.statusRpc==='transition_care_job'&&['assigned','in_progress','completed'].includes(option))?<Button key={String(option)} size="sm" variant="ghost" disabled={saving} onClick={()=>changeStatus(row,option)}>{entity.statusField==='granted'&&option===false?'Withdraw':String(option)}</Button>:null)}{entity.assignmentRpc&&<Button size="sm" variant="outline" disabled={saving} onClick={()=>startEdit(row)}>Assign</Button>}</div></td></tr>)}</tbody></table>{!rows.length && <p className="py-8 text-center text-sm text-muted-foreground">No records yet.</p>}</div>}
         </CardContent></Card>
       </div>
     </>}
