@@ -117,3 +117,65 @@ $$;
 
 revoke all on function public.pharmacy_checkout_v2(uuid,uuid,text,jsonb,text,text,uuid,uuid,text) from public,anon;
 grant execute on function public.pharmacy_checkout_v2(uuid,uuid,text,jsonb,text,text,uuid,uuid,text) to authenticated;
+
+-- Keep the manual opening-stock intake atomic: a batch must never be committed
+-- without its corresponding stock movement and audit event.
+create or replace function public.pharmacy_receive_opening_batch(
+ p_tenant_id uuid,p_branch_id uuid,p_medicine_id uuid,p_supplier_id uuid,
+ p_batch_number text,p_expiry_date date,p_quantity numeric,
+ p_purchase_rate numeric,p_mrp numeric,p_selling_rate numeric
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path=pg_catalog,public,private
+as $$
+declare v_user uuid:=auth.uid(); v_batch uuid;
+begin
+ if v_user is null or not private.has_module_access(p_tenant_id,'pharmacy_suite',p_branch_id,true) then
+  raise exception 'No pharmacy permission';
+ end if;
+ if p_batch_number is null or btrim(p_batch_number)='' or p_expiry_date is null or p_expiry_date<current_date then
+  raise exception 'A batch number and non-expired expiry date are required';
+ end if;
+ if p_quantity is null or p_quantity<=0 then raise exception 'Received quantity must be positive'; end if;
+ if p_purchase_rate is null or p_purchase_rate<0 or p_mrp is null or p_mrp<=0
+  or p_selling_rate is null or p_selling_rate<=0 or p_selling_rate>p_mrp then
+  raise exception 'Purchase rate, MRP and selling rate are invalid';
+ end if;
+ if not exists(select 1 from public.branches where id=p_branch_id and tenant_id=p_tenant_id and status='active') then
+  raise exception 'Active branch not found';
+ end if;
+ if not exists(select 1 from public.medicine_catalogue where id=p_medicine_id and tenant_id=p_tenant_id and status='active') then
+  raise exception 'Active medicine not found';
+ end if;
+ if p_supplier_id is not null and not exists(
+  select 1 from public.pharmacy_suppliers where id=p_supplier_id and tenant_id=p_tenant_id and status='active'
+ ) then raise exception 'Active supplier not found'; end if;
+
+ insert into public.medicine_batches(
+  tenant_id,branch_id,medicine_id,supplier_id,batch_number,expiry_date,
+  quantity_on_hand,purchase_rate,mrp,selling_rate
+ ) values(
+  p_tenant_id,p_branch_id,p_medicine_id,p_supplier_id,btrim(p_batch_number),p_expiry_date,
+  p_quantity,p_purchase_rate,p_mrp,p_selling_rate
+ ) returning id into v_batch;
+
+ insert into public.pharmacy_stock_movements(
+  tenant_id,branch_id,medicine_id,batch_id,movement_type,quantity_delta,
+  reference_type,notes,actor_user_id
+ ) values(
+  p_tenant_id,p_branch_id,p_medicine_id,v_batch,'purchase',p_quantity,
+  'opening_stock','Opening stock batch intake',v_user
+ );
+ insert into public.audit_events(
+  tenant_id,branch_id,actor_user_id,action,entity_type,entity_id,metadata
+ ) values(
+  p_tenant_id,p_branch_id,v_user,'pharmacy.opening_stock_received','medicine_batch',v_batch::text,
+  jsonb_build_object('batch_number',p_batch_number,'quantity',p_quantity,'expiry_date',p_expiry_date)
+ );
+ return v_batch;
+end;
+$$;
+revoke all on function public.pharmacy_receive_opening_batch(uuid,uuid,uuid,uuid,text,date,numeric,numeric,numeric,numeric) from public,anon;
+grant execute on function public.pharmacy_receive_opening_batch(uuid,uuid,uuid,uuid,text,date,numeric,numeric,numeric,numeric) to authenticated;
