@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export const route = { path:'/analytics', layout:'owner', access:'authenticated' };
-export const nav = { icon:'ChartNoAxesCombined', label:'HealthAnalytics', order:15, profiles:['Admin_c'] };
+export const nav = { icon:'ChartNoAxesCombined', label:'HealthAnalytics', order:15, profiles:['VendorOwner','VendorAdmin'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtDate = value => value ? new Date(value).toLocaleDateString('en-IN') : '—';
