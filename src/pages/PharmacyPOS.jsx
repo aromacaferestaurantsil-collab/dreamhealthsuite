@@ -20,6 +20,9 @@ export default function PharmacyPOS() {
   const [medicines,setMedicines] = useState([]);
   const [stock,setStock] = useState([]);
   const [holds,setHolds] = useState([]);
+  const [patients,setPatients] = useState([]);
+  const [patientId,setPatientId] = useState('');
+  const [prescriptionReference,setPrescriptionReference] = useState('');
   const [search,setSearch] = useState('');
   const [cart,setCart] = useState([]);
   const [payment,setPayment] = useState('cash');
@@ -33,14 +36,15 @@ export default function PharmacyPOS() {
     setLoading(true);
     try {
       const db=requireSupabase();
-      const [b,m]=await Promise.all([
+      const [b,m,p]=await Promise.all([
         db.from('branches').select('id,name,branch_code').eq('tenant_id',tenantId).eq('status','active').order('name'),
         db.from('medicine_catalogue').select('id,name,generic_name,brand,strength,dosage_form,gst_rate,prescription_required,status').eq('tenant_id',tenantId).eq('status','active').order('name').limit(500),
+        db.from('patients').select('id,patient_code,full_name,phone,branch_id').eq('tenant_id',tenantId).eq('status','active').order('full_name').limit(1000),
       ]);
-      if(b.error) throw b.error; if(m.error) throw m.error;
+      if(b.error) throw b.error; if(m.error) throw m.error; if(p.error) throw p.error;
       const nextBranches=b.data??[];
       const selected=nextBranches.some(x=>x.id===branchId)?branchId:(nextBranches.some(x=>x.id===activeTenant?.branch_id)?activeTenant.branch_id:(nextBranches[0]?.id||''));
-      setBranches(nextBranches); setMedicines(m.data??[]); setBranchId(selected);
+      setBranches(nextBranches); setMedicines(m.data??[]); setPatients(p.data??[]); setBranchId(selected);
       if(!selected){setStock([]);setHolds([]);}
     } catch(e) { toast.error(e.message || 'Unable to load pharmacy data'); }
     finally { setLoading(false); }
@@ -79,12 +83,15 @@ export default function PharmacyPOS() {
   async function checkout() {
     if(!tenantId || !branchId || !cart.length) return toast.error('Select a branch and add at least one medicine');
     if(!paymentConfirmed) return toast.error('Confirm that payment has actually been received before completing the sale');
+    const requiresPrescription=cart.some(line=>medicines.find(m=>m.id===line.medicineId)?.prescription_required);
+    if(requiresPrescription&&(!patientId||!prescriptionReference.trim()))return toast.error('A patient and prescription reference are required for prescription medicines');
     setSaving(true);
     try {
       const invoiceNumber='HS-'+Date.now().toString(36).toUpperCase();
-      const saleId=await pharmacyCheckoutV2({tenantId,branchId,invoiceNumber,items:cart.map(x=>({medicine_id:x.medicineId,quantity:x.quantity})),paymentMethod:payment,paymentStatus:'paid',idempotencyKey:crypto.randomUUID()});
+      const saleId=await pharmacyCheckoutV2({tenantId,branchId,invoiceNumber,items:cart.map(x=>({medicine_id:x.medicineId,quantity:x.quantity})),paymentMethod:payment,paymentStatus:'paid',idempotencyKey:crypto.randomUUID(),patientId:patientId||null,prescriptionReference:prescriptionReference.trim()||null});
       toast.success('Sale completed · '+invoiceNumber);
       setCart([]);
+      setPatientId('');setPrescriptionReference('');
       setPaymentConfirmed(false);
       await loadInventory();
     } catch(e) { toast.error(e.message || 'Checkout failed'); }
@@ -104,6 +111,10 @@ export default function PharmacyPOS() {
         {cart.map(line=><div key={line.medicineId} className="flex items-center justify-between gap-2 border-b pb-2 text-sm"><div className="min-w-0"><div className="font-medium">{line.name}</div><div className="text-xs text-muted-foreground">{money(line.quantity?lineSubtotal(line)/line.quantity:0)} avg · GST {line.gst}%</div></div><div className="flex items-center gap-2"><Button size="sm" variant="outline" onClick={()=>setCart(old=>old.map(x=>x.medicineId===line.medicineId?{...x,quantity:Math.max(1,x.quantity-1)}:x))}>−</Button><span>{line.quantity}</span><Button size="sm" variant="outline" onClick={()=>add(medicines.find(m=>m.id===line.medicineId))}>+</Button><Button size="sm" variant="ghost" onClick={()=>setCart(old=>old.filter(x=>x.medicineId!==line.medicineId))}>×</Button></div></div>)}
         {!cart.length&&<p className="text-sm text-muted-foreground">Add medicines to begin a sale.</p>}
         <div className="space-y-1 border-t pt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="flex justify-between"><span>GST</span><span>{money(tax)}</span></div><div className="flex justify-between text-base font-bold"><span>Total</span><span>{money(total)}</span></div></div>
+        <div className="space-y-2 border-t pt-3">
+          <label className="block space-y-1 text-sm"><span className="font-medium">Customer / patient (optional)</span><select aria-label="Customer patient" value={patientId} onChange={e=>setPatientId(e.target.value)} className="w-full rounded-md border bg-background p-2"><option value="">Walk-in customer</option>{patients.filter(p=>!p.branch_id||p.branch_id===branchId).map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.patient_code} {p.phone?'· '+p.phone:''}</option>)}</select></label>
+          {cart.some(line=>line.prescriptionRequired)&&<div className="space-y-1"><label className="text-sm font-medium" htmlFor="pos-prescription-reference">Prescription reference *</label><Input id="pos-prescription-reference" value={prescriptionReference} onChange={e=>setPrescriptionReference(e.target.value)} placeholder="Doctor / prescription reference"/><p className="text-xs text-muted-foreground">At least one item requires a prescription; select the patient and enter its reference.</p></div>}
+        </div>
         <select aria-label="Payment method" value={payment} onChange={e=>{setPayment(e.target.value);setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option></select>
         <label className="flex items-start gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)} className="mt-0.5" /><span>I confirm that the customer’s payment has actually been received by the selected method.</span></label>
         <Button className="w-full" disabled={saving || !cart.length || !branchId || !paymentConfirmed} onClick={checkout}>{saving?'Processing…':'Complete paid sale'}</Button>
