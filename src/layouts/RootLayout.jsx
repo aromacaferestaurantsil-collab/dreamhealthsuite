@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { supabase } from '@/lib/supabase';
+import { supabase, requireSupabase } from '@/lib/supabase';
 import { setUser, clearUser, setInitialized } from '@/store/userSlice';
 import { verifyRouteAccess } from '@/router/route.utils';
-import { requireSupabase } from '@/lib/supabase';
 import { APP_CONFIG } from '@/config/app.config';
 import AppLoader from '@/components/AppLoader';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -133,17 +132,13 @@ export default function RootLayout() {
   const allowed = baseAllowed && roleAllowed && entitlementAllowed && !moduleCheckPending;
 
   useEffect(()=>{
-    if(!authReady || !isInitialized) return;
+    if(!authReady || !isInitialized || !baseAllowed) return;
+    if(routeRule && moduleCheckPending) return;
     if(!allowed) {
       if(user) navigate('/access-denied',{replace:true});
       else navigate(`${APP_CONFIG.defaultLoginRoute??'/login'}?redirect=${encodeURIComponent(location.pathname+location.search)}`,{replace:true});
     }
-  },[location.pathname,authReady,isInitialized,allowed,user,navigate]);
-
-  useEffect(()=>{
-    if(!authReady || !isInitialized || !routeRule || moduleCheckPending) return;
-    if(moduleAccess.status==='error' || !roleAllowed || !entitlementAllowed) navigate('/access-denied',{replace:true});
-  },[location.pathname,authReady,isInitialized,routeRule?.key,moduleAccess.status,moduleCheckPending,roleAllowed,entitlementAllowed,navigate]);
+  },[location.pathname,authReady,isInitialized,baseAllowed,allowed,routeRule?.key,moduleCheckPending,user,navigate]);
 
   const handleLogout = async () => {
     if(supabase) await supabase.auth.signOut();
