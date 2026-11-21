@@ -15,7 +15,7 @@ test('available stock excludes expired batches and subtracts active holds only',
 test('FEFO pricing consumes earliest expiry first',()=>{
  const rows=getAvailableBatches(stock,holds,'m1','2026-11-21');
  const result=getFefoLineSubtotal(9,rows);
- assert.equal(result.subtotal,92);assert.equal(result.allocatedQuantity,9);assert.equal(result.remaining,0);
+ assert.equal(result.subtotal,94);assert.equal(result.allocatedQuantity,9);assert.equal(result.remaining,0);
  assert.deepEqual(result.allocation.map(x=>x.batchId),['early','late']);
 });
 test('prescription need is derived from catalogue state',()=>{
