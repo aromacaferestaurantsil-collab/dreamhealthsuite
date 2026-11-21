@@ -28,6 +28,27 @@ export async function pharmacyCheckout({tenantId,branchId,invoiceNumber,items,pa
   });
   if(error) throw error; return data;
 }
+
+export async function labCreateSample({tenantId,bookingItemId,sampleCode,specimenType}) {
+ const {data,error}=await requireSupabase().rpc('lab_create_sample',{
+  p_tenant_id:tenantId,p_booking_item_id:bookingItemId,p_sample_code:sampleCode,p_specimen_type:specimenType,
+ });
+ if(error) throw error; return data;
+}
+export async function labUpdateSampleStatus({tenantId,sampleId,newStatus,rejectionReason=null}) {
+ const {error}=await requireSupabase().rpc('lab_update_sample_status',{
+  p_tenant_id:tenantId,p_sample_id:sampleId,p_new_status:newStatus,p_rejection_reason:rejectionReason,
+ });
+ if(error) throw error;
+}
+export async function labEnterResult({tenantId,bookingItemId,resultText,resultData={},abnormalFlag=false}) {
+ const {data,error}=await requireSupabase().rpc('lab_enter_result',{
+  p_tenant_id:tenantId,p_booking_item_id:bookingItemId,p_result_text:resultText,
+  p_result_data:resultData,p_abnormal_flag:abnormalFlag,
+ });
+ if(error) throw error; return data;
+}
+
 export async function verifyLabResult(resultId,release=false) {
   const {error}=await requireSupabase().rpc('lab_verify_result',{p_result_id:resultId,p_release:release});
   if(error) throw error;
