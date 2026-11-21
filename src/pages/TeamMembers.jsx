@@ -23,7 +23,7 @@ async function hashToken(token){
  return [...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 export const route={path:'/team-members',layout:'owner',access:'authenticated'};
-export const nav={icon:'Users',label:'Team & access',order:5,profiles:null};
+export const nav={icon:'Users',label:'Team & access',order:5,profiles:['Admin_c','Manager']};
 export default function TeamMembers(){
  const {activeTenant}=useTenant();const tenantId=activeTenant?.tenant_id;
  const [members,setMembers]=useState([]);const [branches,setBranches]=useState([]);const [invites,setInvites]=useState([]);
