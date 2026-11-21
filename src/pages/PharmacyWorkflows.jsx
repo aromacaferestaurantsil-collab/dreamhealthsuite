@@ -164,9 +164,13 @@ export default function PharmacyWorkflows(){
   });
  }
  async function reviewOrder(order,decision){
-  if(!['approved','rejected'].includes(decision))return toast.error('Invalid order decision');
+  if(!['approved','rejected','clarification_required'].includes(decision))return toast.error('Invalid order decision');
   const items=currentOrderItems(order.id);
   if(!items.length)return toast.error('This order has no line items to review');
+  if(decision==='clarification_required'){
+   await run(async()=>{await pharmacyReviewCustomerOrder({tenantId,orderId:order.id,decision,notes:reviewNotes[order.id]||'Additional prescription or item details required',itemDecisions:[]});toast.success('Clarification request recorded')});
+   return;
+  }
   const itemDecisions=items.map(i=>({item_id:i.id,item_status:decision==='approved'?(i.item_status==='pending'?'approved':i.item_status):'rejected',suggested_medicine_id:i.suggested_medicine_id||null,note:i.pharmacist_note||null}));
   await run(async()=>{await pharmacyReviewCustomerOrder({tenantId,orderId:order.id,decision,notes:reviewNotes[order.id]||null,itemDecisions});toast.success('Order review saved')});
  }
