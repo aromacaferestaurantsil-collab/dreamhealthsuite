@@ -25,6 +25,8 @@ const roleProfiles = {
   analyst: 'Analyst', staff: 'Staff',
 };
 const moduleRouteRules = [
+  { match: /^\/pharmacy\/pos$/, key: 'pharmacy_suite', roles: ['owner','admin','pharmacist'] },
+  { match: /^\/team-members$/, key: null, roles: ['owner','admin','manager'] },
   { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-workflows$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
   { match: /^\/laboratory(?:\/|$)/, key: 'laboratory_suite', roles: ['owner','admin','manager','pathologist','lab_technician'] },
   { match: /^\/doctors?(?:\/|$)/, key: 'doctor_suite', roles: ['owner','admin','manager','doctor','receptionist'] },
@@ -127,8 +129,8 @@ export default function RootLayout() {
     care_connect:['care_connect','care','careconnect'],
     analytics:['analytics','health_analytics'],
   };
-  const entitlementAllowed = !routeRule || (moduleAccess.status==='ready' && moduleAccess.tenantId===activeTenant?.tenant_id && moduleKeyAliases[routeRule.key].some(key=>moduleAccess.keys.includes(key)));
-  const moduleCheckPending = !!routeRule && ['idle','loading'].includes(moduleAccess.status);
+  const entitlementAllowed = !routeRule || !routeRule.key || (moduleAccess.status==='ready' && moduleAccess.tenantId===activeTenant?.tenant_id && moduleKeyAliases[routeRule.key].some(key=>moduleAccess.keys.includes(key)));
+  const moduleCheckPending = !!routeRule?.key && ['idle','loading'].includes(moduleAccess.status);
   const allowed = baseAllowed && roleAllowed && entitlementAllowed && !moduleCheckPending;
 
   useEffect(()=>{
