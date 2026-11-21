@@ -40,9 +40,9 @@ export default function AuthPage({ mode }) {
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
           const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-          navigate(!patientLinkError && linkedPatient ? '/pharmacy-order' : '/demo-workspace', { replace: true });
+          navigate(!patientLinkError && linkedPatient ? '/pharmacy-order' : '/accept-invite', { replace: true });
         } else {
-          setNotice('Check your email to confirm your account. After confirmation, sign in and open /demo-workspace to claim the synthetic testing workspace.');
+          setNotice('Check your email to confirm your account. After confirmation, sign in using the invitation sent by your organisation administrator. Workspace access requires an approved invitation.');
         }
       } else {
         const { error: authError } = await client.auth.signInWithPassword({
@@ -52,7 +52,7 @@ export default function AuthPage({ mode }) {
         const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
         if (!patientLinkError && linkedPatient) { navigate('/pharmacy-order', { replace: true }); return; }
         const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
-        navigate(membershipRows?.length ? '/' : '/demo-workspace', { replace: true });
+        navigate(membershipRows?.length ? '/' : '/accept-invite', { replace: true });
       }
     } catch (e) {
       setError(e?.message || 'Authentication failed.');
