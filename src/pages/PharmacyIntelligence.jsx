@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { pharmacyCreatePurchaseOrder } from '@/services/healthsuite';
@@ -26,6 +26,7 @@ export default function PharmacyIntelligence() {
  const [sales,setSales]=useState([]); const [saleLines,setSaleLines]=useState([]); const [orders,setOrders]=useState([]);
  const [expenses,setExpenses]=useState([]); const [attendance,setAttendance]=useState([]); const [offers,setOffers]=useState([]); const [customerItems,setCustomerItems]=useState([]); const [customerOrders,setCustomerOrders]=useState([]); const [stockHolds,setStockHolds]=useState([]);
  const [busy,setBusy]=useState(false); const [period,setPeriod]=useState('30');
+ const loadRequest=useRef(0);
  const [supplier,setSupplier]=useState(''); const [poNumber,setPoNumber]=useState('PO-'+Date.now().toString(36).toUpperCase()); const [poLines,setPoLines]=useState([blankLine()]);
  const [expense,setExpense]=useState({category:'Rent',description:'',amount:'',date:today,payment_method:'cash'});
  const [employee,setEmployee]=useState({name:'',status:'present',date:today});
@@ -33,7 +34,8 @@ export default function PharmacyIntelligence() {
  const [hold,setHold]=useState({batch_id:'',quantity:'',hold_type:'quarantine',reason:'',reference_number:''});
 
  async function load() {
-  if(!tenantId)return; setBusy(true);
+  if(!tenantId){setBranches([]);setMedicines([]);setSuppliers([]);setBatches([]);setOrders([]);setExpenses([]);setAttendance([]);setOffers([]);setSales([]);setCustomerItems([]);setCustomerOrders([]);setStockHolds([]);setSaleLines([]);setBusy(false);return;}
+  const request=++loadRequest.current;setBusy(true);
   try {
    const db=requireSupabase();
    const [b,m,s,st,o,e,a,of,sa,ci,co,sh] = await Promise.all([
@@ -51,14 +53,15 @@ export default function PharmacyIntelligence() {
     db.from('pharmacy_stock_holds').select('batch_id,held_quantity').eq('tenant_id',tenantId).eq('hold_status','active').limit(2000)
    ]);
    for(const x of [b,m,s,st,o,e,a,of,sa,ci,co,sh]) if(x.error) throw x.error;
+   if(request!==loadRequest.current)return;
    const selected=branch||activeTenant?.branch_id||b.data?.[0]?.id||'';
    setBranches(b.data||[]);setBranch(selected);setMedicines(m.data||[]);setSuppliers(s.data||[]);setBatches(st.data||[]);
    setOrders(o.data||[]);setExpenses(e.data||[]);setAttendance(a.data||[]);setOffers(of.data||[]);setSales(sa.data||[]);setCustomerItems(ci.data||[]);setCustomerOrders(co.data||[]);setStockHolds(sh.data||[]);
    const saleIds=(sa.data||[]).map(x=>x.id);
-   if(saleIds.length){const lines=await db.from('pharmacy_sale_items').select('sale_id,medicine_id,quantity,line_total').eq('tenant_id',tenantId).in('sale_id',saleIds);if(lines.error)throw lines.error;setSaleLines(lines.data||[])}else setSaleLines([]);
-  } catch(e){toast.error(e.message||'Could not load management data')} finally{setBusy(false)}
+   if(saleIds.length){const lines=await db.from('pharmacy_sale_items').select('sale_id,medicine_id,quantity,line_total').eq('tenant_id',tenantId).in('sale_id',saleIds);if(lines.error)throw lines.error;if(request===loadRequest.current)setSaleLines(lines.data||[])}else if(request===loadRequest.current)setSaleLines([]);
+  } catch(e){if(request===loadRequest.current)toast.error(e.message||'Could not load management data')} finally{if(request===loadRequest.current)setBusy(false)}
  }
- useEffect(()=>{setBranch(activeTenant?.branch_id||'')},[tenantId,activeTenant?.branch_id]);
+ useEffect(()=>{loadRequest.current++;setBranch(activeTenant?.branch_id||'');setBranches([]);setMedicines([]);setSuppliers([]);setBatches([]);setOrders([]);setExpenses([]);setAttendance([]);setOffers([]);setSales([]);setCustomerItems([]);setCustomerOrders([]);setStockHolds([]);setSaleLines([])},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId,branch]);
  const scopedSales=sales.filter(x=>x.branch_id===branch);
  const scopedOrders=orders.filter(x=>x.branch_id===branch);
