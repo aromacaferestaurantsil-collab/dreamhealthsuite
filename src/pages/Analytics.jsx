@@ -92,6 +92,22 @@ export default function Analytics() {
     return <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr>{config.headers.map(x=><th key={x} className="py-3 pr-4">{x}</th>)}</tr></thead><tbody className="divide-y">{rows.map(r=><tr key={r.id}>{config.cells(r).map((x,i)=><td key={i} className="py-3 pr-4">{x}</td>)}</tr>)}</tbody></table>{!rows.length&&<p className="py-8 text-center text-sm text-muted-foreground">No records found for this reporting period.</p>}</div>;
   };
 
+  function exportCurrentReport() {
+    let rows;
+    if (tab==='sales') rows=[['Invoice','Date','Sale status','Payment status','Subtotal','Discount','Tax','Gross total'],...data.sales.map(r=>[r.invoice_number,fmtDate(r.sold_at),r.sale_status,r.payment_status,r.subtotal,r.discount,r.tax_total,r.grand_total])];
+    else if (tab==='purchases') rows=[['Supplier invoice','Bill number','Invoice date','Status','Subtotal','Tax','Total'],...data.purchases.map(r=>[r.supplier_invoice_number,r.order_number,fmtDate(r.supplier_invoice_date||r.received_date),r.status,r.subtotal,r.tax_total,r.total])];
+    else if (tab==='expenses') rows=[['Date','Category','Description','Payment status','Amount'],...data.expenses.map(r=>[r.expense_date,r.category,r.description,r.payment_status,r.amount])];
+    else if (tab==='gst') rows=[['GST metric','Amount'],['Output GST',outputTax],['Input GST',inputTax],['Indicative net GST',gstNet]];
+    else rows=[['Metric','Value'],...metrics];
+    const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
+    const csv='\ufeff'+rows.map(row=>row.map(quote).join(',')).join('\r\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;link.download='healthanalytics-'+tab+'-'+from+'-'+to+'.csv';
+    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+  }
+
   if (!tenantId) return <Card><CardContent className="p-6">Select a workspace to view reports.</CardContent></Card>;
   return <div className="mx-auto max-w-7xl space-y-6">
     <section className="rounded-2xl bg-primary px-6 py-7 text-primary-foreground"><div className="text-xs font-bold uppercase tracking-widest opacity-80">HealthSuite 360 · Business intelligence</div><h1 className="brand-heading mt-2 text-3xl font-black">HealthAnalytics</h1><p className="mt-2 text-sm opacity-85">Branch-scoped operating, finance and GST summaries from recorded transactions.</p></section>
@@ -99,7 +115,7 @@ export default function Analytics() {
       <div className="space-y-1"><Label>Branch</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={branch} onChange={e=>setBranch(e.target.value)}><option value="all">All accessible branches</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select></div>
       <div className="space-y-1"><Label>From</Label><Input type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></div>
       <div className="space-y-1"><Label>To</Label><Input type="date" value={to} min={from} max={today()} onChange={e=>setTo(e.target.value)}/></div>
-      <div className="flex items-end"><Button variant="outline" className="w-full" onClick={()=>setRefreshKey(x=>x+1)} disabled={loading}>{loading?'Refreshing…':'Refresh reports'}</Button></div>
+      <div className="flex items-end gap-2"><Button variant="outline" className="flex-1" onClick={()=>setRefreshKey(x=>x+1)} disabled={loading}>Refresh</Button><Button className="flex-1" onClick={exportCurrentReport} disabled={loading}>Export CSV</Button></div>
     </CardContent></Card>
     <div className="flex flex-wrap gap-2">{tabs.map(([id,label])=><Button key={id} size="sm" variant={tab===id?'default':'outline'} onClick={()=>setTab(id)}>{label}</Button>)}</div>
     {error&&<div className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</div>}
