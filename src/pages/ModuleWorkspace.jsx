@@ -35,9 +35,7 @@ export default function ModuleWorkspace() {
     async function load() {
       if(!tenantId) { setEntitlements([]); setLoading(false); return; }
       setLoading(true); setAccessError('');
-      const {data,error}=await requireSupabase().from('tenant_module_entitlements')
-        .select('module_key,enabled,starts_at,ends_at')
-        .eq('tenant_id',tenantId).eq('enabled',true);
+      const {data,error}=await requireSupabase().rpc('get_my_module_entitlements',{p_tenant_id:tenantId});
       if(!alive)return;
       if(error){setAccessError(error.message);setEntitlements([]);}
       else setEntitlements(data??[]);
