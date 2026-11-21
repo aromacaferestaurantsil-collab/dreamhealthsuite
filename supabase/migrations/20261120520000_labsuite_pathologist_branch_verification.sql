@@ -12,13 +12,17 @@ declare
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
 
- select lr,lb.branch_id into r,v_branch_id
+ select lr into r
  from public.lab_results lr
- join public.lab_booking_items li on li.id=lr.booking_item_id and li.tenant_id=lr.tenant_id
- join public.lab_bookings lb on lb.id=li.booking_id and lb.tenant_id=li.tenant_id
  where lr.id=p_result_id
- for update of lr;
+ for update;
  if not found then raise exception 'Result not found'; end if;
+
+ select lb.branch_id into v_branch_id
+ from public.lab_booking_items li
+ join public.lab_bookings lb on lb.id=li.booking_id and lb.tenant_id=li.tenant_id
+ where li.id=r.booking_item_id and li.tenant_id=r.tenant_id;
+ if not found or v_branch_id is null then raise exception 'Result booking branch not found'; end if;
 
  if not private.has_module_access(r.tenant_id,'laboratory_suite',v_branch_id,true) then
   raise exception 'No laboratory permission for this branch';
