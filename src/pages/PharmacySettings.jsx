@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,10 +21,10 @@ const groups = {
 };
 export default function PharmacySettings(){
  const {activeTenant,user}=useAuth(); const tenantId=activeTenant?.tenant_id; const branchId=activeTenant?.branch_id||null; const db=requireSupabase();
- const [values,setValues]=useState({}); const [branch,setBranch]=useState(branchId||'workspace'); const [loading,setLoading]=useState(false); const [saving,setSaving]=useState(false); const [managerApproval,setManagerApproval]=useState(false);
+ const [values,setValues]=useState({}); const [branch,setBranch]=useState(branchId||'workspace'); const [loading,setLoading]=useState(false); const [saving,setSaving]=useState(false); const [managerApproval,setManagerApproval]=useState(false);const loadRequest=useRef(0);
  const isAdmin=['owner','admin'].includes(activeTenant?.role);
- async function load(){if(!tenantId)return;setLoading(true);try{let q=db.from('pharmacy_settings').select('setting_key,setting_value,branch_id').eq('tenant_id',tenantId);if(branch==='workspace')q=q.is('branch_id',null);else q=q.eq('branch_id',branch);const {data,error}=await q;if(error)throw error;const next={};for(const row of data||[])next[row.setting_key]=row.setting_value?.value??row.setting_value;setValues(next);const {data:permissions,error:permissionError}=await db.from('pharmacy_role_permissions').select('allowed').eq('tenant_id',tenantId).eq('role_key','manager').eq('permission_key','approve_stock_count').is('branch_id',null).maybeSingle();if(permissionError)throw permissionError;setManagerApproval(Boolean(permissions?.allowed))}catch(e){toast.error(e.message||'Could not load settings')}finally{setLoading(false)}}
- useEffect(()=>{setBranch(branchId||'workspace')},[tenantId,branchId]);
+ async function load(){if(!tenantId){setValues({});setManagerApproval(false);setLoading(false);return;}const request=++loadRequest.current;setLoading(true);try{let q=db.from('pharmacy_settings').select('setting_key,setting_value,branch_id').eq('tenant_id',tenantId);if(branch==='workspace')q=q.is('branch_id',null);else q=q.eq('branch_id',branch);const {data,error}=await q;if(error)throw error;if(request!==loadRequest.current)return;const next={};for(const row of data||[])next[row.setting_key]=row.setting_value?.value??row.setting_value;setValues(next);const {data:permissions,error:permissionError}=await db.from('pharmacy_role_permissions').select('allowed').eq('tenant_id',tenantId).eq('role_key','manager').eq('permission_key','approve_stock_count').is('branch_id',null).maybeSingle();if(permissionError)throw permissionError;if(request===loadRequest.current)setManagerApproval(Boolean(permissions?.allowed))}catch(e){if(request===loadRequest.current)toast.error(e.message||'Could not load settings')}finally{if(request===loadRequest.current)setLoading(false)}}
+ useEffect(()=>{loadRequest.current++;setBranch(branchId||'workspace');setValues({});setManagerApproval(false)},[tenantId,branchId]);
  useEffect(()=>{load()},[tenantId,branch]);
  function update(k,v){setValues(x=>({...x,[k]:v}))}
  async function saveManagerApproval(allowed){if(!isAdmin)return;setSaving(true);try{const {error}=await db.from('pharmacy_role_permissions').upsert({tenant_id:tenantId,role_key:'manager',permission_key:'approve_stock_count',allowed,branch_id:null,updated_by:user?.id},{onConflict:'tenant_id,role_key,permission_key,branch_id'});if(error)throw error;setManagerApproval(allowed);toast.success(allowed?'Manager stock-count approval enabled':'Manager stock-count approval revoked')}catch(e){toast.error(e.message||'Could not update manager permission')}finally{setSaving(false)}}
