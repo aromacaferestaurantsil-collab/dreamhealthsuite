@@ -28,7 +28,7 @@ export default function TeamMembers(){
  const {activeTenant}=useTenant();const tenantId=activeTenant?.tenant_id;
  const [members,setMembers]=useState([]);const [branches,setBranches]=useState([]);const [invites,setInvites]=useState([]);
  const [loading,setLoading]=useState(true);const [saving,setSaving]=useState(false);const [error,setError]=useState('');
- const [form,setForm]=useState({email:'',role:'staff',branch_id:'all',days:'7'});
+ const [form,setForm]=useState({email:'',role:'staff',branch_id:activeTenant?.role==='manager'&&activeTenant?.branch_id?activeTenant.branch_id:'all',days:'7'});
  const [createdInvite,setCreatedInvite]=useState(null);
  const load=useCallback(async()=>{
   if(!tenantId){setMembers([]);setInvites([]);setBranches([]);setLoading(false);return;}
@@ -62,7 +62,7 @@ export default function TeamMembers(){
    });
    if(error)throw error;
    setCreatedInvite({email,role:form.role,token,expiresAt,id:data});
-   setForm({email:'',role:'staff',branch_id:'all',days:'7'});
+   setForm({email:'',role:'staff',branch_id:activeTenant?.role==='manager'&&activeTenant?.branch_id?activeTenant.branch_id:'all',days:'7'});
    toast.success('Invitation created. Copy the one-time token and send it securely to the invited person.');
    await load();
   }catch(e){toast.error(e.message||'Unable to create invitation');}
@@ -82,7 +82,7 @@ export default function TeamMembers(){
    <Card><CardHeader><CardTitle>Invite employee</CardTitle></CardHeader><CardContent><form className="space-y-3" onSubmit={createInvitation}>
     <div className="space-y-1"><Label>Email address</Label><Input type="email" value={form.email} onChange={e=>setForm(x=>({...x,email:e.target.value}))} required/></div>
     <div className="space-y-1"><Label>Role</Label><Select value={form.role} onValueChange={role=>setForm(x=>({...x,role}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{roles.map(role=><SelectItem key={role} value={role}>{role.replaceAll('_',' ')}</SelectItem>)}</SelectContent></Select></div>
-    <div className="space-y-1"><Label>Branch access</Label><Select value={form.branch_id} onValueChange= {branch_id=>setForm(x=>({...x,branch_id}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="all">All branches</SelectItem>{branches.map(b=><SelectItem key={b.id} value={b.id}>{b.name} · {b.branch_code}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-1"><Label>Branch access</Label><Select value={form.branch_id} onValueChange= {branch_id=>setForm(x=>({...x,branch_id}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{!(activeTenant?.role==='manager'&&activeTenant?.branch_id)&&<SelectItem value="all">All branches</SelectItem>}{branches.map(b=><SelectItem key={b.id} value={b.id}>{b.name} · {b.branch_code}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1"><Label>Token validity</Label><Select value={form.days} onValueChange={days=>setForm(x=>({...x,days}))}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{['1','3','7','14'].map(d=><SelectItem key={d} value={d}>{d} days</SelectItem>)}</SelectContent></Select></div>
     <Button className="w-full" disabled={saving}>{saving?'Creating…':'Create invitation'}</Button>
    </form></CardContent></Card>
