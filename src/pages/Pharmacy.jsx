@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { pharmacyReceiveOpeningBatch } from '@/services/healthsuite';
@@ -41,9 +41,11 @@ export default function Pharmacy() {
   const [medicineForm,setMedicineForm] = useState(blankMedicine);
   const [supplierForm,setSupplierForm] = useState(blankSupplier);
   const [batchForm,setBatchForm] = useState(blankBatch);
+  const loadRequest = useRef(0);
 
   async function load() {
-    if(!tenantId) return;
+    if(!tenantId) { setBranches([]);setMedicines([]);setBatches([]);setSuppliers([]);setLoading(false);return; }
+    const request=++loadRequest.current;
     setLoading(true);
     try {
       const db=requireSupabase();
@@ -53,6 +55,7 @@ export default function Pharmacy() {
         db.from('pharmacy_suppliers').select('id,name,contact_person,phone,email,gstin,address,status').eq('tenant_id',tenantId).order('name').limit(500),
       ]);
       if(b.error) throw b.error; if(m.error) throw m.error; if(sup.error) throw sup.error;
+      if(request!==loadRequest.current)return;
       const selectedBranch = branchId || activeTenant?.branch_id || b.data?.[0]?.id || '';
       setBranches(b.data??[]); setBranchId(selectedBranch);
       setMedicines(m.data??[]); setSuppliers(sup.data??[]);
@@ -61,12 +64,12 @@ export default function Pharmacy() {
           .select('id,tenant_id,branch_id,medicine_id,supplier_id,batch_number,expiry_date,quantity_on_hand,purchase_rate,mrp,selling_rate,received_at')
           .eq('tenant_id',tenantId).eq('branch_id',selectedBranch).order('expiry_date').limit(2000);
         if(error) throw error;
-        setBatches(data??[]);
-      } else setBatches([]);
-    } catch(e) { toast.error(e.message || 'Unable to load pharmacy records'); }
-    finally { setLoading(false); }
+        if(request===loadRequest.current)setBatches(data??[]);
+      } else if(request===loadRequest.current)setBatches([]);
+    } catch(e) { if(request===loadRequest.current)toast.error(e.message || 'Unable to load pharmacy records'); }
+    finally { if(request===loadRequest.current)setLoading(false); }
   }
-  useEffect(()=>{setBranchId(activeTenant?.branch_id??'');},[tenantId,activeTenant?.branch_id]);
+  useEffect(()=>{loadRequest.current++;setBranchId(activeTenant?.branch_id??'');setBranches([]);setMedicines([]);setBatches([]);setSuppliers([]);},[tenantId,activeTenant?.branch_id]);
   useEffect(()=>{load();},[tenantId,branchId]);
 
   const filtered=useMemo(()=>medicines.filter(m=>[m.name,m.generic_name,m.brand,m.sku,m.hsn_code].some(v=>String(v??'').toLowerCase().includes(search.toLowerCase()))),[medicines,search]);
