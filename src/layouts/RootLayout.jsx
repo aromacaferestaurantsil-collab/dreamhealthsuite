@@ -19,7 +19,7 @@ export function useTenant() {
   return { memberships, activeTenant, setActiveTenant };
 }
 const roleProfiles = {
-  owner: 'Admin_c', admin: 'Admin_c', manager: 'Manager',
+  owner: 'VendorOwner', admin: 'VendorAdmin', manager: 'Manager',
   doctor: 'Doctor', pharmacist: 'Pharmacist', lab_technician: 'LabTechnician',
   pathologist: 'Pathologist', care_worker: 'CareWorker', receptionist: 'Receptionist',
   analyst: 'Analyst', staff: 'Staff',
@@ -62,6 +62,24 @@ export default function RootLayout() {
       if (error) throw error;
       if (!alive) return;
       const rows = data ?? [];
+      let portalProfile = '';
+      try {
+        const [doctorResult, patientResult] = await Promise.all([
+          supabase.from('doctor_profiles').select('id,tenant_id').eq('user_id',sessionUser.id).eq('status','active').limit(2),
+          supabase.rpc('get_my_patient_profile')
+        ]);
+        if (doctorResult.error) throw doctorResult.error;
+        if (doctorResult.data?.length===1) portalProfile='Doctor';
+        else if (doctorResult.data?.length>1) portalProfile='IdentityConflict';
+        if (patientResult.error && !/No patient|not linked|not found/i.test(patientResult.error.message||'')) throw patientResult.error;
+        if (patientResult.data) {
+          if (portalProfile) portalProfile='IdentityConflict';
+          else portalProfile='Patient';
+        }
+      } catch(e) {
+        // A portal identity lookup failure must not grant portal access. Tenant workspace resolution continues.
+        portalProfile='';
+      }
       setMemberships(rows);
       setActiveTenantId(current => rows.some(m=>m.tenant_id===current) ? current : (rows[0]?.tenant_id ?? ''));
       const selected = rows[0];
@@ -69,8 +87,8 @@ export default function RootLayout() {
         id: sessionUser.id, emailAddress: sessionUser.email,
         firstName: sessionUser.user_metadata?.full_name?.split(' ')[0] ?? '',
         lastName: sessionUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') ?? '',
-        profile: selected ? (roleProfiles[selected.role] ?? 'Staff') : 'NoTenant',
-        role: selected?.role ?? null,
+        profile: portalProfile || (selected ? (roleProfiles[selected.role] ?? 'Staff') : 'NoTenant'),
+        role: portalProfile ? portalProfile.toLowerCase() : (selected?.role ?? null),
       }));
       setAuthReady(true);
     };
@@ -93,9 +111,10 @@ export default function RootLayout() {
   };
   const activeTenant = useMemo(()=>memberships.find(m=>m.tenant_id===activeTenantId)??null,[memberships,activeTenantId]);
   useEffect(() => {
-    if (user && (location.pathname === '/login' || location.pathname === '/signup' || location.pathname.endsWith('/login') || location.pathname.endsWith('/signup'))) navigate('/', { replace: true });
-    else if (user && user.profile === 'NoTenant' && location.pathname !== '/workspace/new' && location.pathname !== '/pharmacy-order' && location.pathname !== '/demo-workspace' && location.pathname !== '/accept-invite') navigate('/workspace/new', { replace: true });
-    else if (user && user.profile !== 'NoTenant' && location.pathname === '/workspace/new') navigate('/', { replace: true });
+    if (user && (location.pathname === '/login' || location.pathname === '/signup' || location.pathname.endsWith('/login') || location.pathname.endsWith('/signup'))) navigate(user.profile==='Patient'?'/patient-portal':user.profile==='Doctor'?'/doctor-portal':'/', { replace: true });
+    else if (user && user.profile === 'NoTenant' && !['/workspace/new','/pharmacy-order','/demo-workspace','/accept-invite','/patient-portal','/doctor-portal'].includes(location.pathname)) navigate('/workspace/new', { replace: true });
+    else if (user && ['Patient','Doctor'].includes(user.profile) && location.pathname === '/workspace/new') navigate(user.profile==='Patient'?'/patient-portal':'/doctor-portal', { replace: true });
+    else if (user && user.profile==='IdentityConflict') navigate('/access-denied',{replace:true});
   }, [user, location.pathname, navigate]);
 
   const routeRule = moduleRouteRules.find(rule => rule.match.test(location.pathname));
@@ -122,7 +141,7 @@ export default function RootLayout() {
   const deepestMatch = matches[matches.length-1];
   const accessRule = deepestMatch?.handle?.access ?? 'public';
   const baseAllowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
-  const roleAllowed = !routeRule || routeRule.roles.includes(activeTenant?.role);
+  const roleAllowed = !routeRule || (['patient','doctor'].includes(user?.role) ? routeRule.roles.includes(user.role) : routeRule.roles.includes(activeTenant?.role));
   const moduleKeyAliases = {
     pharmacy_suite:['pharmacy_suite','pharmacy'],
     laboratory_suite:['laboratory_suite','lab_suite','laboratory','lab'],
