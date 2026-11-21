@@ -48,7 +48,7 @@ export default function PharmacyFinance(){
    for(const x of [b,p,s,l,a,cs,po,sp,ex,ep])if(x.error)throw x.error;
    setBranches(b.data||[]);setPatients(p.data||[]);setSuppliers(s.data||[]);setLedger(l.data||[]);setAllocations(a.data||[]);
    setSessions(cs.data||[]);setOrders(po.data||[]);setSupplierPayments(sp.data||[]);setExpenses(ex.data||[]);setExpensePayments(ep.data||[]);
-   const selected=branch||activeTenant?.branch_id||b.data?.[0]?.id||'';
+   const selected=(b.data||[]).some(x=>x.id===branch)?branch:(activeTenant?.branch_id||b.data?.[0]?.id||'');
    setBranch(selected);
    const open=(cs.data||[]).find(x=>x.branch_id===selected&&x.status==='open');
    if(open){const {data,error}=await db.from('pharmacy_cashbook_entries').select('*').eq('tenant_id',tenantId).eq('session_id',open.id).order('occurred_at',{ascending:false}).limit(1000);if(error)throw error;setEntries(data||[])}else setEntries([]);
@@ -71,7 +71,7 @@ export default function PharmacyFinance(){
  const selectedOrder=openOrders.find(x=>x.id===supplierPayment.order);
  const selectedExpense=unpaidExpenses.find(x=>x.id===expensePayment.expense);
  const totalCustomerDue=scoped.reduce((n,x)=>n+Number(x.debit)-Number(x.credit),0);
- const totalSupplierDue=scopedOrders.reduce((n,o)=>n+Math.max(0,Number(o.total)-orderPaid(o.id)),0);
+ const totalSupplierDue=scopedOrders.filter(o=>['received','partially_received','part_received'].includes(o.status)).reduce((n,o)=>n+Math.max(0,Number(o.total)-orderPaid(o.id)),0);
  const totalExpenseDue=unpaidExpenses.reduce((n,e)=>n+Math.max(0,Number(e.amount)-expensePaid(e.id)),0);
 
  async function postReceipt(e){
