@@ -34,7 +34,9 @@ export default function Pharmacy() {
   const [loading,setLoading] = useState(false);
   const [saving,setSaving] = useState(false);
   const [medicineOpen,setMedicineOpen] = useState(false);
+  const [medicineEditId,setMedicineEditId] = useState('');
   const [supplierOpen,setSupplierOpen] = useState(false);
+  const [supplierEditId,setSupplierEditId] = useState('');
   const [batchOpen,setBatchOpen] = useState(false);
   const [medicineForm,setMedicineForm] = useState(blankMedicine);
   const [supplierForm,setSupplierForm] = useState(blankSupplier);
@@ -82,13 +84,32 @@ export default function Pharmacy() {
   async function saveMedicine(e) {
     e.preventDefault(); if(!tenantId) return;
     if(!medicineForm.name.trim()) return toast.error('Medicine name is required');
+    const gst=Number(medicineForm.gst_rate||0),reorder=Number(medicineForm.reorder_level||0),pack=Number(medicineForm.units_per_pack||1);
+    if(!Number.isFinite(gst)||gst<0||gst>100)return toast.error('GST rate must be between 0 and 100');
+    if(!Number.isFinite(reorder)||reorder<0)return toast.error('Reorder level cannot be negative');
+    if(!Number.isFinite(pack)||pack<=0)return toast.error('Units per pack must be greater than zero');
     setSaving(true);
     try {
-      const payload={...medicineForm,tenant_id:tenantId,gst_rate:Number(medicineForm.gst_rate||0),reorder_level:Number(medicineForm.reorder_level||0),units_per_pack:Number(medicineForm.units_per_pack||1),allow_loose_sale:Boolean(medicineForm.allow_loose_sale)};
-      const {error}=await requireSupabase().from('medicine_catalogue').insert(payload);
-      if(error) throw error;
-      toast.success('Medicine added');setMedicineOpen(false);setMedicineForm(blankMedicine());await load();
+      const payload={...medicineForm,tenant_id:tenantId,gst_rate:gst,reorder_level:reorder,units_per_pack:pack,allow_loose_sale:Boolean(medicineForm.allow_loose_sale)};
+      const db=requireSupabase();
+      const result=medicineEditId
+        ? await db.from('medicine_catalogue').update(payload).eq('tenant_id',tenantId).eq('id',medicineEditId)
+        : await db.from('medicine_catalogue').insert(payload);
+      if(result.error) throw result.error;
+      toast.success(medicineEditId?'Medicine updated':'Medicine added');
+      setMedicineOpen(false);setMedicineEditId('');setMedicineForm(blankMedicine());await load();
     } catch(e){toast.error(e.message||'Unable to save medicine');}
+    finally{setSaving(false);}
+  }
+  function editMedicine(m){
+    setMedicineEditId(m.id);
+    setMedicineForm({sku:m.sku??'',name:m.name??'',generic_name:m.generic_name??'',brand:m.brand??'',strength:m.strength??'',dosage_form:m.dosage_form??'Tablet',unit:m.unit??'unit',hsn_code:m.hsn_code??'',gst_rate:String(m.gst_rate??0),reorder_level:String(m.reorder_level??0),units_per_pack:String(m.units_per_pack??1),allow_loose_sale:Boolean(m.allow_loose_sale),prescription_required:Boolean(m.prescription_required),status:m.status??'active'});
+    setMedicineOpen(true);
+  }
+  async function setMedicineStatus(m,status){
+    setSaving(true);
+    try{const {error}=await requireSupabase().from('medicine_catalogue').update({status}).eq('tenant_id',tenantId).eq('id',m.id);if(error)throw error;toast.success('Medicine status updated');await load();}
+    catch(e){toast.error(e.message||'Unable to update medicine status');}
     finally{setSaving(false);}
   }
   async function saveSupplier(e) {
@@ -96,10 +117,27 @@ export default function Pharmacy() {
     if(!supplierForm.name.trim()) return toast.error('Supplier name is required');
     setSaving(true);
     try {
-      const {error}=await requireSupabase().from('pharmacy_suppliers').insert({...supplierForm,tenant_id:tenantId,address:supplierForm.address?{line1:supplierForm.address}:{}});
-      if(error) throw error;
-      toast.success('Supplier added');setSupplierOpen(false);setSupplierForm(blankSupplier());await load();
+      const payload={...supplierForm,tenant_id:tenantId,address:supplierForm.address?{line1:supplierForm.address}:{}};
+      const db=requireSupabase();
+      const result=supplierEditId
+        ? await db.from('pharmacy_suppliers').update(payload).eq('tenant_id',tenantId).eq('id',supplierEditId)
+        : await db.from('pharmacy_suppliers').insert(payload);
+      if(result.error) throw result.error;
+      toast.success(supplierEditId?'Supplier updated':'Supplier added');
+      setSupplierOpen(false);setSupplierEditId('');setSupplierForm(blankSupplier());await load();
     } catch(e){toast.error(e.message||'Unable to save supplier');}
+    finally{setSaving(false);}
+  }
+  function editSupplier(s){
+    setSupplierEditId(s.id);
+    const address=s.address?.line1??'';
+    setSupplierForm({name:s.name??'',contact_person:s.contact_person??'',phone:s.phone??'',email:s.email??'',gstin:s.gstin??'',address,status:s.status??'active'});
+    setSupplierOpen(true);
+  }
+  async function setSupplierStatus(s,status){
+    setSaving(true);
+    try{const {error}=await requireSupabase().from('pharmacy_suppliers').update({status}).eq('tenant_id',tenantId).eq('id',s.id);if(error)throw error;toast.success('Supplier status updated');await load();}
+    catch(e){toast.error(e.message||'Unable to update supplier status');}
     finally{setSaving(false);}
   }
   async function saveBatch(e) {
@@ -125,14 +163,14 @@ export default function Pharmacy() {
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div><div className="text-xs font-extrabold uppercase tracking-widest text-primary">HealthSuite 360 · Pharmacy operations</div><h1 className="brand-heading mt-1 text-3xl font-black">PharmaSuite</h1><p className="mt-1 text-sm text-muted-foreground">Tenant-scoped medicine catalogue, supplier register, batch inventory and expiry control.</p></div>
       <div className="flex flex-wrap gap-2">
-        <Dialog open={medicineOpen} onOpenChange={setMedicineOpen}><DialogTrigger asChild><Button>Add medicine</Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Add medicine to catalogue</DialogTitle></DialogHeader><form onSubmit={saveMedicine} className="grid gap-4 sm:grid-cols-2">
+        <Dialog open={medicineOpen} onOpenChange={open=>{setMedicineOpen(open);if(!open){setMedicineEditId('');setMedicineForm(blankMedicine());}}}><DialogTrigger asChild><Button onClick={()=>{setMedicineEditId('');setMedicineForm(blankMedicine());}}>Add medicine</Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>{medicineEditId?'Edit medicine':'Add medicine to catalogue'}</DialogTitle></DialogHeader><form onSubmit={saveMedicine} className="grid gap-4 sm:grid-cols-2">
           <Field label="Medicine name *"><Input value={medicineForm.name} onChange={e=>setMedicineForm({...medicineForm,name:e.target.value})} required/></Field><Field label="SKU"><Input value={medicineForm.sku} onChange={e=>setMedicineForm({...medicineForm,sku:e.target.value})}/></Field>
           <Field label="Generic / salt"><Input value={medicineForm.generic_name} onChange={e=>setMedicineForm({...medicineForm,generic_name:e.target.value})}/></Field><Field label="Brand"><Input value={medicineForm.brand} onChange={e=>setMedicineForm({...medicineForm,brand:e.target.value})}/></Field>
           <Field label="Strength"><Input value={medicineForm.strength} onChange={e=>setMedicineForm({...medicineForm,strength:e.target.value})} placeholder="e.g. 500 mg"/></Field><Field label="Dosage form"><Select value={medicineForm.dosage_form} onValueChange={v=>setMedicineForm({...medicineForm,dosage_form:v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{['Tablet','Capsule','Syrup','Suspension','Injection','Cream','Ointment','Drops','Inhaler','Other'].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select></Field>
           <Field label="Unit"><Input value={medicineForm.unit} onChange={e=>setMedicineForm({...medicineForm,unit:e.target.value})}/></Field><Field label="HSN code"><Input value={medicineForm.hsn_code} onChange={e=>setMedicineForm({...medicineForm,hsn_code:e.target.value})}/></Field>
           <Field label="GST rate (%)"><Input type="number" min="0" max="100" step="0.01" value={medicineForm.gst_rate} onChange={e=>setMedicineForm({...medicineForm,gst_rate:e.target.value})}/></Field><Field label="Reorder level"><Input type="number" min="0" value={medicineForm.reorder_level} onChange={e=>setMedicineForm({...medicineForm,reorder_level:e.target.value})}/></Field><Field label="Units per pack"><Input type="number" min="0.001" step="0.001" value={medicineForm.units_per_pack} onChange={e=>setMedicineForm({...medicineForm,units_per_pack:e.target.value})}/></Field><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={medicineForm.allow_loose_sale} onChange={e=>setMedicineForm({...medicineForm,allow_loose_sale:e.target.checked})}/> Allow loose-unit sales</label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={medicineForm.prescription_required} onChange={e=>setMedicineForm({...medicineForm,prescription_required:e.target.checked})}/> Prescription required</label>
-          <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setMedicineOpen(false)}>Cancel</Button><Button disabled={saving}>{saving?'Saving…':'Save medicine'}</Button></div>
+          <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setMedicineOpen(false)}>Cancel</Button><Button disabled={saving}>{saving?'Saving…':medicineEditId?'Update medicine':'Save medicine'}</Button></div>
         </form></DialogContent></Dialog>
         <Dialog open={batchOpen} onOpenChange={setBatchOpen}><DialogTrigger asChild><Button variant="outline">Receive stock</Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl"><DialogHeader><DialogTitle>Receive medicine batch</DialogTitle></DialogHeader><form onSubmit={saveBatch} className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2"><Field label="Medicine *"><Select value={batchForm.medicine_id} onValueChange={v=>{const m=medicines.find(x=>x.id===v);setBatchForm({...batchForm,medicine_id:v,mrp:batchForm.mrp||String(m?.mrp??''),selling_rate:batchForm.selling_rate||''});}}><SelectTrigger><SelectValue placeholder="Select medicine"/></SelectTrigger><SelectContent>{medicines.map(m=><SelectItem key={m.id} value={m.id}>{m.name} {m.strength||''}</SelectItem>)}</SelectContent></Select></Field></div>
@@ -142,12 +180,12 @@ export default function Pharmacy() {
           <Field label="MRP (₹)"><Input type="number" min="0" step="0.01" value={batchForm.mrp} onChange={e=>setBatchForm({...batchForm,mrp:e.target.value})}/></Field><Field label="Selling rate (₹)"><Input type="number" min="0" step="0.01" value={batchForm.selling_rate} onChange={e=>setBatchForm({...batchForm,selling_rate:e.target.value})}/></Field>
           <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setBatchOpen(false)}>Cancel</Button><Button disabled={saving||!medicines.length}>{saving?'Saving…':'Receive stock'}</Button></div>
         </form></DialogContent></Dialog>
-        <Dialog open={supplierOpen} onOpenChange={setSupplierOpen}><DialogTrigger asChild><Button variant="ghost">Add supplier</Button></DialogTrigger><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>New supplier</DialogTitle></DialogHeader><form onSubmit={saveSupplier} className="grid gap-4 sm:grid-cols-2">
+        <Dialog open={supplierOpen} onOpenChange={open=>{setSupplierOpen(open);if(!open){setSupplierEditId('');setSupplierForm(blankSupplier());}}}><DialogTrigger asChild><Button variant="ghost" onClick={()=>{setSupplierEditId('');setSupplierForm(blankSupplier());}}>Add supplier</Button></DialogTrigger><DialogContent className="sm:max-w-lg"><DialogHeader><DialogTitle>{supplierEditId?'Edit supplier':'New supplier'}</DialogTitle></DialogHeader><form onSubmit={saveSupplier} className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2"><Field label="Supplier name *"><Input value={supplierForm.name} onChange={e=>setSupplierForm({...supplierForm,name:e.target.value})} required/></Field></div>
           <Field label="Contact person"><Input value={supplierForm.contact_person} onChange={e=>setSupplierForm({...supplierForm,contact_person:e.target.value})}/></Field><Field label="Phone"><Input value={supplierForm.phone} onChange={e=>setSupplierForm({...supplierForm,phone:e.target.value})}/></Field>
           <Field label="Email"><Input type="email" value={supplierForm.email} onChange={e=>setSupplierForm({...supplierForm,email:e.target.value})}/></Field><Field label="GSTIN"><Input value={supplierForm.gstin} onChange={e=>setSupplierForm({...supplierForm,gstin:e.target.value.toUpperCase()})} maxLength={15}/></Field>
           <div className="sm:col-span-2"><Field label="Address"><Input value={supplierForm.address} onChange={e=>setSupplierForm({...supplierForm,address:e.target.value})}/></Field></div>
-          <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setSupplierOpen(false)}>Cancel</Button><Button disabled={saving}>{saving?'Saving…':'Save supplier'}</Button></div>
+          <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={()=>setSupplierOpen(false)}>Cancel</Button><Button disabled={saving}>{saving?'Saving…':supplierEditId?'Update supplier':'Save supplier'}</Button></div>
         </form></DialogContent></Dialog>
       </div>
     </div>
@@ -161,11 +199,11 @@ export default function Pharmacy() {
         <Card><CardHeader><CardTitle className="text-base">Low-stock watchlist</CardTitle></CardHeader><CardContent>{medicines.filter(m=>onHand(m.id)<=Number(m.reorder_level||0)).slice(0,10).map(m=><div key={m.id} className="flex items-center justify-between border-b py-3 text-sm"><div><div className="font-bold">{m.name}</div><div className="text-xs text-muted-foreground">{m.generic_name||m.brand||'No generic mapping'}</div></div><Badge variant="destructive">Available {onHand(m.id)} · Reorder {m.reorder_level}</Badge></div>)}{!lowStock&&<p className="py-5 text-sm text-muted-foreground">No low-stock medicines based on current reorder levels.</p>}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Expiry monitoring</CardTitle></CardHeader><CardContent>{batches.filter(b=>b.expiry_date<=new Date(Date.now()+90*86400000).toISOString().slice(0,10)&&Number(b.quantity_on_hand)>0).slice(0,10).map(b=><div key={b.id} className="flex items-center justify-between border-b py-3 text-sm"><div><div className="font-bold">{medicines.find(m=>m.id===b.medicine_id)?.name||'Medicine'}</div><div className="text-xs text-muted-foreground">Batch {b.batch_number} · {b.expiry_date}</div></div><Badge variant={b.expiry_date<today()?'destructive':'secondary'}>{b.expiry_date<today()?'Expired':'Expiring'}</Badge></div>)}{!expiring&&<p className="py-5 text-sm text-muted-foreground">No batches expiring within 90 days.</p>}</CardContent></Card>
       </TabsContent>
-      <TabsContent value="medicines"><Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">Medicine catalogue <Badge variant="secondary" className="ml-2">{filtered.length}</Badge></CardTitle><Input className="w-64" placeholder="Search name, generic, brand, SKU" value={search} onChange={e=>setSearch(e.target.value)}/></div></CardHeader><CardContent>{loading?<p className="py-8 text-sm text-muted-foreground">Loading medicines…</p>:<div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Medicine</th><th>Generic / brand</th><th>Form</th><th>GST</th><th>Reorder level</th><th>Status</th></tr></thead><tbody className="divide-y">{filtered.map(m=><tr key={m.id}><td className="py-3 font-bold">{m.name}<div className="text-xs font-normal text-muted-foreground">{m.strength||'—'} · {m.sku||'No SKU'}</div></td><td>{m.generic_name||'—'}<div className="text-xs text-muted-foreground">{m.brand||'—'}</div></td><td>{m.dosage_form||'—'}</td><td>{m.gst_rate}%</td><td>{m.reorder_level}</td><td><Badge variant={m.status==='active'?'default':'secondary'}>{m.status}</Badge></td></tr>)}</tbody></table>{!filtered.length&&<p className="py-8 text-center text-sm text-muted-foreground">No medicines match this search.</p>}</div>}</CardContent></Card></TabsContent>
+      <TabsContent value="medicines"><Card><CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">Medicine catalogue <Badge variant="secondary" className="ml-2">{filtered.length}</Badge></CardTitle><Input className="w-64" placeholder="Search name, generic, brand, SKU" value={search} onChange={e=>setSearch(e.target.value)}/></div></CardHeader><CardContent>{loading?<p className="py-8 text-sm text-muted-foreground">Loading medicines…</p>:<div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Medicine</th><th>Generic / brand</th><th>Form</th><th>GST</th><th>Reorder level</th><th>Status</th><th>Actions</th></tr></thead><tbody className="divide-y">{filtered.map(m=><tr key={m.id}><td className="py-3 font-bold">{m.name}<div className="text-xs font-normal text-muted-foreground">{m.strength||'—'} · {m.sku||'No SKU'}</div></td><td>{m.generic_name||'—'}<div className="text-xs text-muted-foreground">{m.brand||'—'}</div></td><td>{m.dosage_form||'—'}</td><td>{m.gst_rate}%</td><td>{m.reorder_level}</td><td><Badge variant={m.status==='active'?'default':'secondary'}>{m.status}</Badge></td><td className="whitespace-nowrap"><Button size="sm" variant="outline" onClick={()=>editMedicine(m)}>Edit</Button><Button size="sm" variant="ghost" disabled={saving} onClick={()=>setMedicineStatus(m,m.status==='active'?'inactive':'active')}>{m.status==='active'?'Deactivate':'Activate'}</Button></td></tr>)}</tbody></table>{!filtered.length&&<p className="py-8 text-center text-sm text-muted-foreground">No medicines match this search.</p>}</div>}</CardContent></Card></TabsContent>
       <TabsContent value="inventory"><Card><CardHeader><CardTitle className="text-base">Batch-wise inventory</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Medicine</th><th>Batch</th><th>Expiry</th><th>Qty</th><th>Purchase</th><th>MRP</th><th>Selling</th></tr></thead><tbody className="divide-y">{batches.map(b=><tr key={b.id}><td className="py-3 font-bold">{medicines.find(m=>m.id===b.medicine_id)?.name||'—'}</td><td>{b.batch_number}</td><td>{b.expiry_date}</td><td className="font-bold">{b.quantity_on_hand}</td><td>{money(b.purchase_rate)}</td><td>{money(b.mrp)}</td><td>{money(b.selling_rate)}</td></tr>)}</tbody></table>{!batches.length&&<p className="py-8 text-center text-sm text-muted-foreground">No batch stock recorded for this branch.</p>}</div></CardContent></Card></TabsContent>
       <TabsContent value="expired"><Card><CardHeader><CardTitle className="text-base">Expired medicines · blocked from sale</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Medicine</th><th>Batch</th><th>Expiry</th><th>Quantity quarantined</th><th>Distributor</th></tr></thead><tbody className="divide-y">{batches.filter(b=>b.expiry_date<today()&&Number(b.quantity_on_hand)>0).map(b=><tr key={b.id}><td className="py-3 font-bold">{medicines.find(m=>m.id===b.medicine_id)?.name||'—'}</td><td>{b.batch_number}</td><td className="font-bold text-red-600">{b.expiry_date}</td><td>{b.quantity_on_hand}</td><td>{suppliers.find(s=>s.id===b.supplier_id)?.name||'—'}</td></tr>)}</tbody></table>{!batches.some(b=>b.expiry_date<today()&&Number(b.quantity_on_hand)>0)&&<p className="py-8 text-center text-sm text-muted-foreground">No expired stock recorded.</p>}</div><p className="mt-3 text-xs text-red-600">Expired batches are excluded from POS availability and cannot be sold.</p></CardContent></Card></TabsContent>
       <TabsContent value="expiring"><Card><CardHeader><CardTitle className="text-base">Expiring within 90 days</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Medicine</th><th>Batch</th><th>Expiry</th><th>Quantity</th><th>Distributor</th></tr></thead><tbody className="divide-y">{batches.filter(b=>b.expiry_date>=today()&&b.expiry_date<=new Date(Date.now()+90*86400000).toISOString().slice(0,10)&&Number(b.quantity_on_hand)>0).map(b=><tr key={b.id}><td className="py-3 font-bold">{medicines.find(m=>m.id===b.medicine_id)?.name||'—'}</td><td>{b.batch_number}</td><td>{b.expiry_date}</td><td>{b.quantity_on_hand}</td><td>{suppliers.find(s=>s.id===b.supplier_id)?.name||'—'}</td></tr>)}</tbody></table>{!expiring&&<p className="py-8 text-center text-sm text-muted-foreground">No medicines expiring in the next 90 days.</p>}</div></CardContent></Card></TabsContent>
-      <TabsContent value="suppliers"><Card><CardHeader><CardTitle className="text-base">Supplier register</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Supplier</th><th>Contact person</th><th>Phone</th><th>Email</th><th>GSTIN</th><th>Status</th></tr></thead><tbody className="divide-y">{suppliers.map(s=><tr key={s.id}><td className="py-3 font-bold">{s.name}</td><td>{s.contact_person||'—'}</td><td>{s.phone||'—'}</td><td>{s.email||'—'}</td><td>{s.gstin||'—'}</td><td><Badge variant={s.status==='active'?'default':'secondary'}>{s.status}</Badge></td></tr>)}</tbody></table>{!suppliers.length&&<p className="py-8 text-center text-sm text-muted-foreground">No suppliers registered yet.</p>}</div></CardContent></Card></TabsContent>
+      <TabsContent value="suppliers"><Card><CardHeader><CardTitle className="text-base">Supplier register</CardTitle></CardHeader><CardContent><div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Supplier</th><th>Contact person</th><th>Phone</th><th>Email</th><th>GSTIN</th><th>Status</th><th>Actions</th></tr></thead><tbody className="divide-y">{suppliers.map(s=><tr key={s.id}><td className="py-3 font-bold">{s.name}</td><td>{s.contact_person||'—'}</td><td>{s.phone||'—'}</td><td>{s.email||'—'}</td><td>{s.gstin||'—'}</td><td><Badge variant={s.status==='active'?'default':'secondary'}>{s.status}</Badge></td><td className="whitespace-nowrap"><Button size="sm" variant="outline" onClick={()=>editSupplier(s)}>Edit</Button><Button size="sm" variant="ghost" disabled={saving} onClick={()=>setSupplierStatus(s,s.status==='active'?'inactive':'active')}>{s.status==='active'?'Deactivate':'Activate'}</Button></td></tr>)}</tbody></table>{!suppliers.length&&<p className="py-8 text-center text-sm text-muted-foreground">No suppliers registered yet.</p>}</div></CardContent></Card></TabsContent>
     </Tabs>
     <p className="text-xs leading-5 text-muted-foreground">Inventory now separates add-new-items, stocks, expired batches and expiring-soon views. Expired batches are excluded from POS checkout. Purchase-rate entry compares the latest recorded purchase rate and highlights increases in red, while showing the purchase rate as a percentage of MRP.</p>
   </div>;
