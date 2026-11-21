@@ -12,7 +12,7 @@ declare
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
 
- select lr.*,lb.branch_id into r,v_branch_id
+ select lr,lb.branch_id into r,v_branch_id
  from public.lab_results lr
  join public.lab_booking_items li on li.id=lr.booking_item_id and li.tenant_id=lr.tenant_id
  join public.lab_bookings lb on lb.id=li.booking_id and lb.tenant_id=li.tenant_id
