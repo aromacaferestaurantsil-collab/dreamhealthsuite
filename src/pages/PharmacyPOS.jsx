@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { pharmacyCheckoutV2 } from '@/services/healthsuite';
+import { cartRequiresPrescription, getAvailableBatches, getFefoLineSubtotal, validateCartQuantities } from '@/lib/pharmacy-pos-logic';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,26 +65,28 @@ export default function PharmacyPOS() {
       if(request===inventoryRequest.current){setStock(s.data??[]);setHolds(h.data??[]);}
     }catch(e){if(request===inventoryRequest.current){toast.error(e.message||'Unable to load branch inventory');setStock([]);setHolds([]);}}
   }
-  const heldFor = batchId => holds.filter(h=>h.batch_id===batchId).reduce((n,h)=>n+Number(h.held_quantity||0),0);
-  const availableFor = medicineId => stock.filter(b=>b.medicine_id===medicineId && b.expiry_date>=new Date().toISOString().slice(0,10)).map(b=>({...b,available:Math.max(0,Number(b.quantity_on_hand)-heldFor(b.id))})).filter(b=>b.available>0);
+  const availableFor = medicineId => getAvailableBatches(stock,holds,medicineId,new Date());
+  const requiresPrescription = cartRequiresPrescription(cart,medicines);
   const filtered=useMemo(()=>medicines.filter(m=>[m.name,m.generic_name,m.brand,m.strength].some(v=>String(v??'').toLowerCase().includes(search.toLowerCase()))),[medicines,search]);
-  const lineSubtotal = line => { let remaining=line.quantity; return availableFor(line.medicineId).reduce((sum,b)=>{const take=Math.min(remaining,b.available);remaining-=take;return sum+take*Number(b.selling_rate||0);},0); };
+  const lineSubtotal = line => getFefoLineSubtotal(line.quantity,availableFor(line.medicineId)).subtotal;
   const subtotal=cart.reduce((n,x)=>n+lineSubtotal(x),0);
   const tax=cart.reduce((n,x)=>n+lineSubtotal(x)*x.gst/100,0);
   const total=subtotal+tax;
 
   function add(medicine) {
+    if(!medicine)return;
     const batches=availableFor(medicine.id);
     const available=batches.reduce((n,b)=>n+b.available,0);
     const line=cart.find(x=>x.medicineId===medicine.id);
     if(available<=0) return toast.error('No unexpired stock for this medicine in the selected branch');
     if(line?.quantity>=available) return toast.error('Quantity exceeds available stock');
-    setCart(old=>line?old.map(x=>x.medicineId===medicine.id?{...x,quantity:x.quantity+1}:x):[...old,{medicineId:medicine.id,name:medicine.name,strength:medicine.strength,quantity:1,price:Number(batches[0]?.selling_rate??0),gst:Number(medicine.gst_rate??0)}]);
+    setCart(old=>line?old.map(x=>x.medicineId===medicine.id?{...x,quantity:x.quantity+1}:x):[...old,{medicineId:medicine.id,name:medicine.name,strength:medicine.strength,quantity:1,price:Number(batches[0]?.selling_rate??0),gst:Number(medicine.gst_rate??0),prescriptionRequired:Boolean(medicine.prescription_required)}]);
   }
   async function checkout() {
     if(!tenantId || !branchId || !cart.length) return toast.error('Select a branch and add at least one medicine');
     if(!paymentConfirmed) return toast.error('Confirm that payment has actually been received before completing the sale');
-    const requiresPrescription=cart.some(line=>medicines.find(m=>m.id===line.medicineId)?.prescription_required);
+    const quantityIssues=validateCartQuantities(cart,stock,holds,new Date());
+    if(quantityIssues.length)return toast.error('Cart quantities exceed current available stock. Refresh inventory and review the cart.');
     if(requiresPrescription&&(!patientId||!prescriptionReference.trim()))return toast.error('A patient and prescription reference are required for prescription medicines');
     setSaving(true);
     try {
@@ -103,7 +106,7 @@ export default function PharmacyPOS() {
     <section className="rounded-2xl bg-primary px-6 py-6 text-primary-foreground"><div className="text-xs font-bold uppercase tracking-widest opacity-80">PharmaSuite · Supabase</div><h1 className="mt-2 text-3xl font-black">Sale</h1><p className="mt-2 text-sm opacity-85">Record medicine sales with batch-aware FEFO checkout. Expired stock is never eligible for sale.</p></section>
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
       <Card><CardHeader><CardTitle>Medicine catalogue</CardTitle></CardHeader><CardContent className="space-y-3">
-        <select aria-label="Branch" value={branchId} onChange={e=>{inventoryRequest.current++;setStock([]);setHolds([]);setBranchId(e.target.value);setCart([]);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>
+        <select aria-label="Branch" value={branchId} onChange={e=>{inventoryRequest.current++;setStock([]);setHolds([]);setBranchId(e.target.value);setCart([]);setPatientId('');setPrescriptionReference('');setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>
         <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search medicine, brand or strength" />
         {loading?<p className="text-sm text-muted-foreground">Loading inventory…</p>:<div className="max-h-[560px] space-y-2 overflow-auto">{filtered.map(m=>{const available=availableFor(m.id).reduce((n,b)=>n+b.available,0);return <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><div className="font-semibold">{m.name} {m.strength}</div><div className="text-xs text-muted-foreground">{m.brand??m.generic_name??m.dosage_form??'Medicine'} · Stock {available}</div></div><Button size="sm" disabled={!available || !branchId} onClick={()=>add(m)}>Add</Button></div>;})}{!filtered.length&&<p className="text-sm text-muted-foreground">No medicines found.</p>}</div>}
       </CardContent></Card>
@@ -113,7 +116,7 @@ export default function PharmacyPOS() {
         <div className="space-y-1 border-t pt-3 text-sm"><div className="flex justify-between"><span>Subtotal</span><span>{money(subtotal)}</span></div><div className="flex justify-between"><span>GST</span><span>{money(tax)}</span></div><div className="flex justify-between text-base font-bold"><span>Total</span><span>{money(total)}</span></div></div>
         <div className="space-y-2 border-t pt-3">
           <label className="block space-y-1 text-sm"><span className="font-medium">Customer / patient (optional)</span><select aria-label="Customer patient" value={patientId} onChange={e=>setPatientId(e.target.value)} className="w-full rounded-md border bg-background p-2"><option value="">Walk-in customer</option>{patients.filter(p=>!p.branch_id||p.branch_id===branchId).map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.patient_code} {p.phone?'· '+p.phone:''}</option>)}</select></label>
-          {cart.some(line=>line.prescriptionRequired)&&<div className="space-y-1"><label className="text-sm font-medium" htmlFor="pos-prescription-reference">Prescription reference *</label><Input id="pos-prescription-reference" value={prescriptionReference} onChange={e=>setPrescriptionReference(e.target.value)} placeholder="Doctor / prescription reference"/><p className="text-xs text-muted-foreground">At least one item requires a prescription; select the patient and enter its reference.</p></div>}
+          {requiresPrescription&&<div className="space-y-1"><label className="text-sm font-medium" htmlFor="pos-prescription-reference">Prescription reference *</label><Input id="pos-prescription-reference" value={prescriptionReference} onChange={e=>setPrescriptionReference(e.target.value)} placeholder="Doctor / prescription reference"/><p className="text-xs text-muted-foreground">At least one item requires a prescription; select the patient and enter its reference.</p></div>}
         </div>
         <select aria-label="Payment method" value={payment} onChange={e=>{setPayment(e.target.value);setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank transfer</option></select>
         <label className="flex items-start gap-2 rounded-lg border p-3 text-sm"><input type="checkbox" checked={paymentConfirmed} onChange={e=>setPaymentConfirmed(e.target.checked)} className="mt-0.5" /><span>I confirm that the customer’s payment has actually been received by the selected method.</span></label>
