@@ -36,16 +36,12 @@ export default function TeamMembers(){
   try{
    const db=requireSupabase();
    const [m,b,i]=await Promise.all([
-    db.from('tenant_memberships').select('id,user_id,branch_id,role,status,created_at').eq('tenant_id',tenantId).order('created_at',{ascending:false}),
+    db.rpc('list_tenant_team_members',{p_tenant_id:tenantId,p_branch_id:activeTenant?.role==='manager'?activeTenant?.branch_id??null:null,p_role:null}),
     db.from('branches').select('id,name,branch_code').eq('tenant_id',tenantId).eq('status','active').order('name'),
     db.from('tenant_invitations').select('id,email,role,branch_id,expires_at,accepted_at,revoked_at,created_at').eq('tenant_id',tenantId).is('accepted_at',null).is('revoked_at',null).order('created_at',{ascending:false})
    ]);
    for(const q of [m,b,i])if(q.error)throw q.error;
-   const ids=[...new Set((m.data??[]).map(x=>x.user_id))];
-   let profiles=[];
-   if(ids.length){const p=await db.from('user_profiles').select('user_id,full_name,phone').in('user_id',ids);if(p.error)throw p.error;profiles=p.data??[];}
-   const byId=new Map(profiles.map(p=>[p.user_id,p]));
-   setMembers((m.data??[]).map(x=>({...x,full_name:byId.get(x.user_id)?.full_name||x.user_id,phone:byId.get(x.user_id)?.phone||''})));
+   setMembers(m.data??[]);
    setBranches(b.data??[]);setInvites(i.data??[]);
   }catch(e){setError(e.message||'Unable to load team records');}
   finally{setLoading(false);}
