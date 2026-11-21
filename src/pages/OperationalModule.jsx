@@ -56,6 +56,7 @@ export default function OperationalModule({ config }) {
             });
             if(error)throw error;
             items=data||[];
+            if(lookup.activeOnly) items=items.filter(item=>item.status==='active');
           } else {
             let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name');
             if (lookup.tenantScoped !== false) query = query.eq('tenant_id', activeTenant.tenant_id);
