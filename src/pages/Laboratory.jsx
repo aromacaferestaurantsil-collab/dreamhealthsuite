@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 export const route = { path: '/laboratory', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Microscope', label: 'LabSuite', order: 11, profiles: ['Admin_c', 'Pathologist', 'LabTechnician'] };
+export const nav = { icon: 'Microscope', label: 'LabSuite', order: 11, profiles: ['VendorOwner','VendorAdmin','Manager','Pathologist','LabTechnician'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const dateTime = value => value ? new Date(value).toLocaleString('en-IN') : '—';
