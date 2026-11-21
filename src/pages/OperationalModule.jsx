@@ -47,24 +47,35 @@ export default function OperationalModule({ config }) {
       const next = {};
       try {
         for (const lookup of lookups) {
-          let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name');
-          if (lookup.tenantScoped !== false) query = query.eq('tenant_id', activeTenant.tenant_id);
-          if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
-          if (lookup.membershipBranchScope && activeTenant.branch_id) query = query.or('branch_id.is.null,branch_id.eq.' + activeTenant.branch_id);
-          if (lookup.statusField && lookup.activeStatus) query = query.eq(lookup.statusField, lookup.activeStatus);
-          if (lookup.roleField && lookup.role) query = query.eq(lookup.roleField, lookup.role);
-          if (lookup.statusFieldName && lookup.membershipActiveStatus) query = query.eq(lookup.statusFieldName, lookup.membershipActiveStatus);
-          if (lookup.orderBy) query = query.order(lookup.orderBy, {ascending:true});
-          const {data,error} = await query.limit(500);
-          if (error) throw error;
-          let items = data || [];
-          if (lookup.memberUserJoin) {
-            const userIds = items.map(item=>item.user_id).filter(Boolean);
-            if(userIds.length) {
-              const {data:profiles,error:profileError}=await requireSupabase().from('user_profiles').select('user_id,full_name,phone').in('user_id',userIds);
-              if(profileError)throw profileError;
-              const byId=new Map((profiles||[]).map(profile=>[profile.user_id,profile]));
-              items=items.map(item=>({...item,full_name:byId.get(item.user_id)?.full_name||item.user_id}));
+          let items = [];
+          if (lookup.memberRpc) {
+            const {data,error}=await requireSupabase().rpc(lookup.memberRpc,{
+              p_tenant_id:activeTenant.tenant_id,
+              p_branch_id:lookup.branchScoped?activeTenant.branch_id??null:null,
+              p_role:lookup.role??null
+            });
+            if(error)throw error;
+            items=data||[];
+          } else {
+            let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name');
+            if (lookup.tenantScoped !== false) query = query.eq('tenant_id', activeTenant.tenant_id);
+            if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
+            if (lookup.membershipBranchScope && activeTenant.branch_id) query = query.or('branch_id.is.null,branch_id.eq.' + activeTenant.branch_id);
+            if (lookup.statusField && lookup.activeStatus) query = query.eq(lookup.statusField, lookup.activeStatus);
+            if (lookup.roleField && lookup.role) query = query.eq(lookup.roleField, lookup.role);
+            if (lookup.statusFieldName && lookup.membershipActiveStatus) query = query.eq(lookup.statusFieldName, lookup.membershipActiveStatus);
+            if (lookup.orderBy) query = query.order(lookup.orderBy, {ascending:true});
+            const {data,error} = await query.limit(500);
+            if (error) throw error;
+            items = data || [];
+            if (lookup.memberUserJoin) {
+              const userIds = items.map(item=>item.user_id).filter(Boolean);
+              if(userIds.length) {
+                const {data:profiles,error:profileError}=await requireSupabase().from('user_profiles').select('user_id,full_name,phone').in('user_id',userIds);
+                if(profileError)throw profileError;
+                const byId=new Map((profiles||[]).map(profile=>[profile.user_id,profile]));
+                items=items.map(item=>({...item,full_name:byId.get(item.user_id)?.full_name||item.user_id}));
+              }
             }
           }
           next[lookup.field] = items;
