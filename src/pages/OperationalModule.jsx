@@ -107,6 +107,13 @@ export default function OperationalModule({ config }) {
       if (entity.table === 'patient_consents' && payload.granted === false && !payload.withdrawn_at) {
         payload.withdrawn_at = new Date().toISOString();
       }
+      if (entity.assignmentRpc && editingId) {
+        if (!payload.assigned_to) throw new Error('Choose a care worker before assigning this job');
+        const {error:assignError}=await client.rpc(entity.assignmentRpc,{p_job_id:editingId,p_assignee_user_id:payload.assigned_to,p_notes:'Assigned or reassigned from Care Connect workspace'});
+        if(assignError)throw assignError;
+        toast.success('Job assigned to selected care worker');
+        setValues({});setEditingId('');await load();return;
+      }
       let request = client.from(entity.table);
       if (editingId) {
         const { error: updateError } = await request.update(payload).eq('tenant_id', activeTenant.tenant_id).eq('id', editingId);
