@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 export const route = { path: '/pharmacy-workflows', layout: 'owner', access: 'authenticated' };
 export const nav = { icon: 'ClipboardList', label: 'Operations & registers', section: 'PharmaSuite · Management', order: 14, profiles: ['VendorOwner','VendorAdmin','Manager','Pharmacist'] };
 const Field=({label,children})=><div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const date=new Date();date.setMinutes(date.getMinutes()-date.getTimezoneOffset());return date.toISOString().slice(0,10)};
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const csv=rows=>rows.map(row=>row.map(v=>'"'+String(v??'').replaceAll('"','""')+'"').join(',')).join('\r\n');
 const saveFile=(name,text,type)=>{const u=URL.createObjectURL(new Blob([text],{type}));const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);};
