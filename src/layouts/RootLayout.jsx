@@ -29,7 +29,7 @@ const moduleRouteRules = [
   { match: /^\/patient-portal$/, key: null, roles: ['patient'] },
   { match: /^\/pharmacy\/pos$/, key: 'pharmacy_suite', roles: ['owner','admin','pharmacist'] },
   { match: /^\/team-members$/, key: null, roles: ['owner','admin','manager'] },
-  { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-workflows$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
+  { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-(?:workflows|finance|growth|intelligence|operations|settings|stock-control)$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
   { match: /^\/laboratory(?:\/|$)/, key: 'laboratory_suite', roles: ['owner','admin','manager','pathologist','lab_technician'] },
   { match: /^\/doctors?(?:\/|$)/, key: 'doctor_suite', roles: ['owner','admin','manager','doctor','receptionist'] },
   { match: /^\/patients?(?:\/|$)/, key: 'patient_suite', roles: ['owner','admin','manager','receptionist','doctor','pharmacist','lab_technician','pathologist'] },
