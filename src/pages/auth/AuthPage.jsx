@@ -42,8 +42,7 @@ export default function AuthPage({ mode }) {
         if (authError) throw authError;
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
-          const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-          navigate(safeRedirect || (!patientLinkError && linkedPatient ? '/pharmacy-order' : '/accept-invite'), { replace: true });
+          navigate(safeRedirect || '/accept-invite', { replace: true });
         } else {
           setNotice('Check your email to confirm your account. After confirmation, sign in using the invitation sent by your organisation administrator. Workspace access requires an approved invitation.');
         }
@@ -52,10 +51,18 @@ export default function AuthPage({ mode }) {
           email: email.trim().toLowerCase(), password,
         });
         if (authError) throw authError;
-        const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-        if (!patientLinkError && linkedPatient) { navigate('/pharmacy-order', { replace: true }); return; }
-        const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
-        navigate(safeRedirect || (membershipRows?.length ? '/' : '/accept-invite'), { replace: true });
+        if (safeRedirect) { navigate(safeRedirect,{replace:true}); return; }
+        const {data:sessionData}=await client.auth.getUser();
+        const userId=sessionData.user?.id;
+        if(!userId)throw new Error('Sign in completed but user identity is unavailable');
+        const {data:doctorRows,error:doctorError}=await client.from('doctor_profiles').select('id').eq('user_id',userId).eq('status','active').limit(2);
+        if(doctorError)throw doctorError;
+        if(doctorRows?.length===1){navigate('/doctor-portal',{replace:true});return;}
+        if(doctorRows?.length>1)throw new Error('Multiple doctor profiles are linked to this account. Contact your clinic administrator.');
+        const {data:patientRow,error:patientError}=await client.rpc('get_my_patient_profile');
+        if(!patientError&&patientRow){navigate('/patient-portal',{replace:true});return;}
+        const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',userId).eq('status','active').limit(1);
+        navigate(membershipRows?.length ? '/' : '/accept-invite', { replace: true });
       }
     } catch (e) {
       setError(e?.message || 'Authentication failed.');
