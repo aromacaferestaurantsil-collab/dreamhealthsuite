@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 
 export const route = { path: '/workspace/:module', layout: 'owner', access: 'authenticated' };
 
 const catalogue = {
   pharmacy: { key:'pharmacy_suite', name:'PharmaSuite', icon:'Pill', audience:'Pharmacy ERP', path:'/pharmacy', capabilities:['Medicine catalogue and generic mapping','Barcode point-of-sale and GST invoices','Batch-wise inventory and expiry alerts','Purchases, distributors and supplier balances','Returns, cash closing and branch transfers'] },
-  laboratory: { key:'lab_suite', name:'LabSuite', icon:'Microscope', audience:'Diagnostic centre ERP', path:'/lab', capabilities:['Test catalogue, bookings and pricing','Barcode sample intake and collection workflow','Sample processing and outsourced tests','Independent result verification and report release','Pending reports and turnaround analytics'] },
+  laboratory: { key:'lab_suite', name:'LabSuite', icon:'Microscope', audience:'Diagnostic centre ERP', path:'/laboratory', capabilities:['Test catalogue, bookings and pricing','Barcode sample intake and collection workflow','Sample processing and outsourced tests','Independent result verification and report release','Pending reports and turnaround analytics'] },
   doctors: { key:'doctor_suite', name:'DoctorSuite', icon:'Stethoscope', audience:'Doctor and clinic ERP', path:'/doctors', capabilities:['Doctor profile, clinic locations and working hours','Appointment slots and schedule controls','Patient history and digital prescriptions','Diagnostic orders and follow-up reminders','Consultation and professional fee records'] },
   patients: { key:'patient_suite', name:'PatientSuite', icon:'HeartPulse', audience:'Patient identity and portal', path:'/patients', capabilities:['Unified patient ID and consent records','Appointments and prescription history','Verified laboratory reports and downloads','Medicine order and delivery history','Communication preferences and notifications'] },
   'care-connect': { key:'care_connect', name:'Care Connect', icon:'Truck', audience:'Delivery and collection operations', path:'/care-connect', capabilities:['Delivery and collection work queues','Medicine delivery status and OTP confirmation','Home sample collection and barcode handover','Assignment and reassignment','Attendance and payment reports'] },
