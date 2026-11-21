@@ -1,6 +1,6 @@
 import OperationalModule from './OperationalModule';
 export const route = { path: '/doctors', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Stethoscope', label: 'DoctorSuite', order: 12, profiles: null };
+export const nav = { icon: 'Stethoscope', label: 'Doctor directory', order: 12, profiles: ['VendorOwner','VendorAdmin','Manager','Receptionist'] };
 const config = {
  title:'DoctorSuite', audience:'Clinics and consultations',
  description:'Maintain verified doctor credentials and tenant-scoped appointment schedules. Clinical notes and prescriptions remain subject to role-based authorisation.',
