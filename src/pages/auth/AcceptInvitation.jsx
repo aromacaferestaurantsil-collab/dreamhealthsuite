@@ -1,5 +1,5 @@
 import { useMemo,useState } from 'react';
-import { useLocation,useNavigate,Link } from 'react-router-dom';
+import { useLocation,Link } from 'react-router-dom';
 import { requireSupabase } from '@/lib/supabase';
 import AuthLayout from './AuthLayout';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ async function hashToken(token) {
   return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 export default function AcceptInvitation() {
- const location=useLocation(); const navigate=useNavigate(); const {user}=useAuth();
+ const location=useLocation(); const {user}=useAuth();
  const initialToken=useMemo(()=>new URLSearchParams(location.search).get('token')||'', [location.search]);
  const [token,setToken]=useState(initialToken); const [busy,setBusy]=useState(false); const [error,setError]=useState('');
  async function accept(event){
