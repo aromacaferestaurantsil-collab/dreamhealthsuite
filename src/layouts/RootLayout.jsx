@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useMatches, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { supabase } from '@/lib/supabase';
+import { supabase, requireSupabase } from '@/lib/supabase';
 import { setUser, clearUser, setInitialized } from '@/store/userSlice';
 import { verifyRouteAccess } from '@/router/route.utils';
 import { APP_CONFIG } from '@/config/app.config';
@@ -19,11 +19,24 @@ export function useTenant() {
   return { memberships, activeTenant, setActiveTenant };
 }
 const roleProfiles = {
-  owner: 'Admin_c', admin: 'Admin_c', manager: 'Manager',
+  owner: 'VendorOwner', admin: 'VendorAdmin', manager: 'Manager',
   doctor: 'Doctor', pharmacist: 'Pharmacist', lab_technician: 'LabTechnician',
   pathologist: 'Pathologist', care_worker: 'CareWorker', receptionist: 'Receptionist',
   analyst: 'Analyst', staff: 'Staff',
 };
+const moduleRouteRules = [
+  { match: /^\/doctor-portal$/, key: null, roles: ['doctor'] },
+  { match: /^\/patient-portal$/, key: null, roles: ['patient'] },
+  { match: /^\/pharmacy\/pos$/, key: 'pharmacy_suite', roles: ['owner','admin','pharmacist'] },
+  { match: /^\/team-members$/, key: null, roles: ['owner','admin','manager'] },
+  { match: /^\/pharmacy-settings$/, key: 'pharmacy_suite', roles: ['owner','admin','manager'] },
+  { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-(?:workflows|finance|growth|intelligence|operations|settings|stock-control)$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
+  { match: /^\/laboratory(?:\/|$)/, key: 'laboratory_suite', roles: ['owner','admin','manager','pathologist','lab_technician'] },
+  { match: /^\/doctors?(?:\/|$)/, key: 'doctor_suite', roles: ['owner','admin','manager','doctor','receptionist'] },
+  { match: /^\/patients?(?:\/|$)/, key: 'patient_suite', roles: ['owner','admin','manager','receptionist','doctor','pharmacist','lab_technician','pathologist'] },
+  { match: /^\/care-connect(?:\/|$)/, key: 'care_connect', roles: ['owner','admin','manager','care_worker'] },
+  { match: /^\/analytics(?:\/|$)/, key: 'analytics', roles: ['owner','admin','analyst'] },
+];
 
 export default function RootLayout() {
   const dispatch = useDispatch();
@@ -31,6 +44,7 @@ export default function RootLayout() {
   const [memberships,setMemberships] = useState([]);
   const [activeTenantId,setActiveTenantId] = useState('');
   const [authReady,setAuthReady] = useState(false);
+  const [moduleAccess,setModuleAccess] = useState({status:'idle',tenantId:'',keys:[]});
   const location = useLocation();
   const navigate = useNavigate();
   const matches = useMatches();
@@ -49,6 +63,21 @@ export default function RootLayout() {
       if (error) throw error;
       if (!alive) return;
       const rows = data ?? [];
+      let portalProfile = '';
+      try {
+        const doctorResult = await supabase.from('doctor_profiles').select('id,tenant_id').eq('user_id',sessionUser.id).eq('status','active').limit(2);
+        if (doctorResult.error) throw doctorResult.error;
+        if (doctorResult.data?.length===1) portalProfile='Doctor';
+        else if (doctorResult.data?.length>1) portalProfile='IdentityConflict';
+        if (!portalProfile && rows.length===0) {
+          const patientResult = await supabase.rpc('get_my_patient_profile');
+          if (patientResult.error && !/No patient|not linked|not found/i.test(patientResult.error.message||'')) throw patientResult.error;
+          if (patientResult.data) portalProfile='Patient';
+        }
+      } catch(e) {
+        // A portal identity lookup failure must not grant portal access. Tenant workspace resolution continues.
+        portalProfile='';
+      }
       setMemberships(rows);
       setActiveTenantId(current => rows.some(m=>m.tenant_id===current) ? current : (rows[0]?.tenant_id ?? ''));
       const selected = rows[0];
@@ -56,8 +85,8 @@ export default function RootLayout() {
         id: sessionUser.id, emailAddress: sessionUser.email,
         firstName: sessionUser.user_metadata?.full_name?.split(' ')[0] ?? '',
         lastName: sessionUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') ?? '',
-        profile: selected ? (roleProfiles[selected.role] ?? 'Staff') : 'NoTenant',
-        role: selected?.role ?? null,
+        profile: portalProfile || (selected ? (roleProfiles[selected.role] ?? 'Staff') : 'NoTenant'),
+        role: portalProfile ? portalProfile.toLowerCase() : (selected?.role ?? null),
       }));
       setAuthReady(true);
     };
@@ -80,22 +109,57 @@ export default function RootLayout() {
   };
   const activeTenant = useMemo(()=>memberships.find(m=>m.tenant_id===activeTenantId)??null,[memberships,activeTenantId]);
   useEffect(() => {
-    if (user && (location.pathname === '/login' || location.pathname === '/signup' || location.pathname.endsWith('/login') || location.pathname.endsWith('/signup'))) navigate('/', { replace: true });
-    else if (user && user.profile === 'NoTenant' && location.pathname !== '/workspace/new' && location.pathname !== '/pharmacy-order' && location.pathname !== '/demo-workspace') navigate('/workspace/new', { replace: true });
-    else if (user && user.profile !== 'NoTenant' && location.pathname === '/workspace/new') navigate('/', { replace: true });
+    if (user && (location.pathname === '/login' || location.pathname === '/signup' || location.pathname.endsWith('/login') || location.pathname.endsWith('/signup'))) navigate(user.profile==='Patient'?'/patient-portal':user.profile==='Doctor'?'/doctor-portal':'/', { replace: true });
+    else if (user && user.profile === 'NoTenant' && !['/workspace/new','/pharmacy-order','/demo-workspace','/accept-invite','/patient-portal','/doctor-portal'].includes(location.pathname)) navigate('/workspace/new', { replace: true });
+    else if (user && ['Patient','Doctor'].includes(user.profile) && location.pathname === '/workspace/new') navigate(user.profile==='Patient'?'/patient-portal':'/doctor-portal', { replace: true });
+    else if (user && user.profile==='IdentityConflict') navigate('/access-denied',{replace:true});
   }, [user, location.pathname, navigate]);
+
+  const routeRule = moduleRouteRules.find(rule => rule.match.test(location.pathname));
+  useEffect(() => {
+    let alive = true;
+    async function checkModuleAccess() {
+      if (!activeTenant?.tenant_id || !user) {
+        if (alive) setModuleAccess({status:'not-required',tenantId:activeTenant?.tenant_id??'',keys:[]});
+        return;
+      }
+      setModuleAccess({status:'loading',tenantId:activeTenant.tenant_id,keys:[]});
+      try {
+        const {data,error}=await requireSupabase().rpc('get_my_module_entitlements',{p_tenant_id:activeTenant.tenant_id});
+        if(error) throw error;
+        if(alive) setModuleAccess({status:'ready',tenantId:activeTenant.tenant_id,keys:(data??[]).filter(row=>row.enabled).map(row=>row.module_key)});
+      } catch(error) {
+        if(alive) setModuleAccess({status:'error',tenantId:activeTenant.tenant_id,keys:[],message:error.message});
+      }
+    }
+    checkModuleAccess();
+    return ()=>{alive=false;};
+  },[activeTenant?.tenant_id,user?.id]);
 
   const deepestMatch = matches[matches.length-1];
   const accessRule = deepestMatch?.handle?.access ?? 'public';
-  const allowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
+  const baseAllowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
+  const roleAllowed = !routeRule || (['patient','doctor'].includes(user?.role) ? routeRule.roles.includes(user.role) : routeRule.roles.includes(activeTenant?.role));
+  const moduleKeyAliases = {
+    pharmacy_suite:['pharmacy_suite','pharmacy'],
+    laboratory_suite:['laboratory_suite','lab_suite','laboratory','lab'],
+    doctor_suite:['doctor_suite','doctor','doctors'],
+    patient_suite:['patient_suite','patient','patients'],
+    care_connect:['care_connect','care','careconnect'],
+    analytics:['analytics','health_analytics'],
+  };
+  const entitlementAllowed = !routeRule || !routeRule.key || (moduleAccess.status==='ready' && moduleAccess.tenantId===activeTenant?.tenant_id && moduleKeyAliases[routeRule.key].some(key=>moduleAccess.keys.includes(key)));
+  const moduleCheckPending = !!routeRule?.key && ['idle','loading'].includes(moduleAccess.status);
+  const allowed = baseAllowed && roleAllowed && entitlementAllowed && !moduleCheckPending;
 
   useEffect(()=>{
-    if(!authReady || !isInitialized) return;
+    if(!authReady || !isInitialized || !baseAllowed) return;
+    if(routeRule && moduleCheckPending) return;
     if(!allowed) {
       if(user) navigate('/access-denied',{replace:true});
       else navigate(`${APP_CONFIG.defaultLoginRoute??'/login'}?redirect=${encodeURIComponent(location.pathname+location.search)}`,{replace:true});
     }
-  },[location.pathname,authReady,isInitialized,allowed,user,navigate]);
+  },[location.pathname,authReady,isInitialized,baseAllowed,allowed,routeRule?.key,moduleCheckPending,user,navigate]);
 
   const handleLogout = async () => {
     if(supabase) await supabase.auth.signOut();
@@ -104,7 +168,7 @@ export default function RootLayout() {
   };
   if(!authReady || !isInitialized || !allowed) return <AppLoader fullScreen />;
   return (
-    <AuthContext.Provider value={{logout:handleLogout,user,isAuthenticated,memberships,activeTenant,setActiveTenant}}>
+    <AuthContext.Provider value={{logout:handleLogout,user,isAuthenticated,memberships,activeTenant,setActiveTenant,moduleAccess}}>
       <ErrorBoundary fullPage><Outlet /></ErrorBoundary>
     </AuthContext.Provider>
   );

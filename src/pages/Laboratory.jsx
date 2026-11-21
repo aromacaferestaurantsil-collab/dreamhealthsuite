@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 
 export const route = { path: '/laboratory', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'Microscope', label: 'LabSuite', order: 11, profiles: ['Admin_c', 'Pathologist', 'LabTechnician'] };
+export const nav = { icon: 'Microscope', label: 'LabSuite', order: 11, profiles: ['VendorOwner','VendorAdmin','Manager','Pathologist','LabTechnician'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const dateTime = value => value ? new Date(value).toLocaleString('en-IN') : '—';
@@ -41,6 +41,8 @@ export default function Laboratory() {
   const [verifyingId, setVerifyingId] = useState('');
   const [error, setError] = useState('');
   const [form, setForm] = useState({ test_code: '', name: '', department: '', specimen_type: '', price: '', turnaround_hours: '' });
+  const [editingTestId,setEditingTestId]=useState('');
+  const [bookingActionId,setBookingActionId]=useState('');
   const [tab, setTab] = useState('overview');
 
   const load = useCallback(async () => {
@@ -82,27 +84,41 @@ export default function Laboratory() {
     event.preventDefault();
     if (!tenantId) return toast.error('Select an active workspace first.');
     if (!form.name.trim()) return toast.error('Test name is required.');
+    const price=Number(form.price||0),tat=form.turnaround_hours?Number(form.turnaround_hours):null;
+    if(!Number.isFinite(price)||price<0)return toast.error('Test price cannot be negative');
+    if(tat!==null&&(!Number.isInteger(tat)||tat<1||tat>720))return toast.error('Turnaround time must be between 1 and 720 hours');
     setSaving(true);
     try {
-      const { error: insertError } = await requireSupabase().from('lab_test_catalogue').insert({
-        tenant_id: tenantId,
-        test_code: form.test_code.trim() || null,
-        name: form.name.trim(),
-        department: form.department.trim() || null,
-        specimen_type: form.specimen_type.trim() || null,
-        price: Number(form.price || 0),
-        turnaround_hours: form.turnaround_hours ? Number(form.turnaround_hours) : null,
-        status: 'active',
-      });
-      if (insertError) throw insertError;
-      toast.success('Test added to the catalogue.');
-      setForm({ test_code: '', name: '', department: '', specimen_type: '', price: '', turnaround_hours: '' });
+      const payload={tenant_id:tenantId,test_code:form.test_code.trim()||null,name:form.name.trim(),department:form.department.trim()||null,specimen_type:form.specimen_type.trim()||null,price,turnaround_hours:tat,status:'active'};
+      const db=requireSupabase();
+      const result=editingTestId
+        ? await db.from('lab_test_catalogue').update(payload).eq('tenant_id',tenantId).eq('id',editingTestId)
+        : await db.from('lab_test_catalogue').insert(payload);
+      if(result.error)throw result.error;
+      toast.success(editingTestId?'Test updated':'Test added to the catalogue.');
+      setForm({test_code:'',name:'',department:'',specimen_type:'',price:'',turnaround_hours:''});setEditingTestId('');
       await load();
-    } catch (e) {
-      toast.error(e.message || 'Could not save test');
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { toast.error(e.message || 'Could not save test'); }
+    finally { setSaving(false); }
+  }
+  function editTest(test){
+    setEditingTestId(test.id);
+    setForm({test_code:test.test_code||'',name:test.name||'',department:test.department||'',specimen_type:test.specimen_type||'',price:String(test.price??0),turnaround_hours:test.turnaround_hours?String(test.turnaround_hours):''});
+  }
+  async function setTestStatus(test,status){
+    setSaving(true);try{
+      const {error}=await requireSupabase().from('lab_test_catalogue').update({status}).eq('tenant_id',tenantId).eq('id',test.id);
+      if(error)throw error;toast.success('Test status updated');await load();
+    }catch(e){toast.error(e.message||'Unable to change test status');}finally{setSaving(false);}
+  }
+  async function reviewBooking(bookingId,decision){
+    if(!['confirmed','rejected'].includes(decision))return;
+    setBookingActionId(bookingId);
+    try{
+      const {error}=await requireSupabase().rpc('lab_review_booking_request',{p_booking_id:bookingId,p_decision:decision,p_notes:null});
+      if(error)throw error;toast.success(decision==='confirmed'?'Booking confirmed':'Booking request rejected');await load();
+    }catch(e){toast.error(e.message||'Unable to review booking request');}
+    finally{setBookingActionId('');}
   }
 
   const bookingItemLabel = item => {
@@ -229,7 +245,7 @@ export default function Laboratory() {
       </TabsContent>
 
       <TabsContent value="catalogue" className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
-        <Card><CardHeader><CardTitle className="text-base">Add diagnostic test</CardTitle></CardHeader><CardContent>
+        <Card><CardHeader><CardTitle className="text-base">{editingTestId?'Edit diagnostic test':'Add diagnostic test'}</CardTitle></CardHeader><CardContent>
           <form onSubmit={saveTest} className="space-y-3">
             <div className="space-y-1"><Label>Test name *</Label><Input value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required maxLength={160} /></div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -239,19 +255,19 @@ export default function Laboratory() {
               <div className="space-y-1"><Label>Price (₹)</Label><Input type="number" min="0" step="0.01" value={form.price} onChange={e => setForm(v => ({ ...v, price: e.target.value }))} /></div>
               <div className="space-y-1 sm:col-span-2"><Label>Turnaround time (hours)</Label><Input type="number" min="1" step="1" value={form.turnaround_hours} onChange={e => setForm(v => ({ ...v, turnaround_hours: e.target.value }))} /></div>
             </div>
-            <Button type="submit" className="w-full" disabled={saving}>{saving ? 'Saving…' : 'Add test'}</Button>
+            <div className="flex gap-2"><Button type="submit" className="flex-1" disabled={saving}>{saving?'Saving…':editingTestId?'Update test':'Add test'}</Button>{editingTestId&&<Button type="button" variant="outline" onClick={()=>{setEditingTestId('');setForm({test_code:'',name:'',department:'',specimen_type:'',price:'',turnaround_hours:''})}}>Cancel</Button>}</div>
           </form>
         </CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">Diagnostic test catalogue</CardTitle></CardHeader><CardContent>
-          <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Test</th><th>Department</th><th>Specimen</th><th>Price</th><th>Status</th></tr></thead><tbody className="divide-y">
-            {tests.map(t => <tr key={t.id}><td className="py-3 font-semibold">{t.name}<div className="text-xs font-normal text-muted-foreground">{t.test_code || 'No code'} · {t.turnaround_hours ? t.turnaround_hours + 'h' : 'TAT not set'}</div></td><td>{t.department || '—'}</td><td>{t.specimen_type || '—'}</td><td>{money(t.price)}</td><td><Badge variant={statusTone(t.status)}>{t.status}</Badge></td></tr>)}
+          <div className="overflow-x-auto"><table className="w-full min-w-[600px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Test</th><th>Department</th><th>Specimen</th><th>Price</th><th>Status</th><th>Actions</th></tr></thead><tbody className="divide-y">
+            {tests.map(t => <tr key={t.id}><td className="py-3 font-semibold">{t.name}<div className="text-xs font-normal text-muted-foreground">{t.test_code || 'No code'} · {t.turnaround_hours ? t.turnaround_hours + 'h' : 'TAT not set'}</div></td><td>{t.department || '—'}</td><td>{t.specimen_type || '—'}</td><td>{money(t.price)}</td><td><Badge variant={statusTone(t.status)}>{t.status}</Badge></td><td className="whitespace-nowrap"><Button size="sm" variant="outline" onClick={()=>editTest(t)}>Edit</Button><Button size="sm" variant="ghost" disabled={saving} onClick={()=>setTestStatus(t,t.status==='active'?'inactive':'active')}>{t.status==='active'?'Deactivate':'Activate'}</Button></td></tr>)}
           </tbody></table>{!tests.length && <p className="py-8 text-center text-sm text-muted-foreground">No tests configured yet. Add the first test to begin.</p>}</div>
         </CardContent></Card>
       </TabsContent>
 
       <TabsContent value="bookings"><Card><CardHeader><CardTitle className="text-base">Lab bookings</CardTitle></CardHeader><CardContent>
-        <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Booking</th><th>Booked</th><th>Scheduled</th><th>Amount</th><th>Payment</th><th>Status</th></tr></thead><tbody className="divide-y">
-          {bookings.map(b => <tr key={b.id}><td className="py-3 font-semibold">{b.booking_number}</td><td>{dateTime(b.booked_at)}</td><td>{dateTime(b.scheduled_at)}</td><td>{money(b.total_amount)}</td><td>{b.payment_status}</td><td><Badge variant={statusTone(b.booking_status)}>{b.booking_status}</Badge></td></tr>)}
+        <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Booking</th><th>Booked</th><th>Scheduled</th><th>Amount</th><th>Payment</th><th>Status</th><th>Action</th></tr></thead><tbody className="divide-y">
+          {bookings.map(b => <tr key={b.id}><td className="py-3 font-semibold">{b.booking_number}</td><td>{dateTime(b.booked_at)}</td><td>{dateTime(b.scheduled_at)}</td><td>{money(b.total_amount)}</td><td>{b.payment_status}</td><td><Badge variant={statusTone(b.booking_status)}>{b.booking_status}</Badge></td><td>{b.booking_status==='requested'&&['owner','admin','manager','receptionist'].includes(activeTenant?.role)?<div className="flex gap-1"><Button size="sm" disabled={bookingActionId===b.id} onClick={()=>reviewBooking(b.id,'confirmed')}>Confirm</Button><Button size="sm" variant="outline" disabled={bookingActionId===b.id} onClick={()=>reviewBooking(b.id,'rejected')}>Reject</Button></div>:<span className="text-xs text-muted-foreground">{b.booking_status==='confirmed'?'Confirmed':'—'}</span>}</td></tr>)}
         </tbody></table>{!bookings.length && <p className="py-8 text-center text-sm text-muted-foreground">No bookings found.</p>}</div>
       </CardContent></Card></TabsContent>
 

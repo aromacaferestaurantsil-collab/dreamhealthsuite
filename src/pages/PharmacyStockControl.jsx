@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {useAuth} from '@/layouts/RootLayout';
 import {requireSupabase} from '@/lib/supabase';
 import {Card,CardContent,CardHeader,CardTitle} from '@/components/ui/card';
@@ -18,8 +18,8 @@ export default function PharmacyStockControl(){
  const [loc,setLoc]=useState({code:'',name:'',type:'rack'});const [countId,setCountId]=useState('');const [countNo,setCountNo]=useState('CNT-'+Date.now().toString(36).toUpperCase());const [countRows,setCountRows]=useState([]);
  const [claim,setClaim]=useState({supplier:'',batch:'',type:'expiry',qty:'1',amount:'0',number:'CLM-'+Date.now().toString(36).toUpperCase()});
  const [refill,setRefill]=useState({patient:'',medicine:'',due:today(),channel:'in_app'});
- const [gst,setGst]=useState({start:today().slice(0,7)+'-01',end:today(),type:'purchase_gstr2b'});
- async function load(){if(!tenantId)return;setBusy(true);try{const [b,m,st,l,su,c,cl,rr]=await Promise.all([
+ const [gst,setGst]=useState({start:today().slice(0,7)+'-01',end:today(),type:'purchase_gstr2b'});const loadRequest=useRef(0);
+ async function load(){if(!tenantId){setBranches([]);setMeds([]);setBatches([]);setLocations([]);setSuppliers([]);setCounts([]);setClaims([]);setReminders([]);setBusy(false);return;}const request=++loadRequest.current;setBusy(true);try{const [b,m,st,l,su,c,cl,rr]=await Promise.all([
  db.from('branches').select('id,name').eq('tenant_id',tenantId).eq('status','active').order('name'),
  db.from('medicine_catalogue').select('id,name,strength').eq('tenant_id',tenantId).eq('status','active').order('name'),
  db.from('medicine_batches').select('id,medicine_id,batch_number,expiry_date,quantity_on_hand,branch_id,location_id,supplier_id,purchase_rate,mrp').eq('tenant_id',tenantId).order('expiry_date').limit(4000),
@@ -27,8 +27,9 @@ export default function PharmacyStockControl(){
  db.from('pharmacy_stock_counts').select('*').eq('tenant_id',tenantId).order('started_at',{ascending:false}).limit(50),
  db.from('pharmacy_expiry_claims').select('*').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(50),
  db.from('pharmacy_refill_reminders').select('*').eq('tenant_id',tenantId).order('expected_refill_date').limit(100)
- ]);for(const x of [b,m,st,l,su,c,cl,rr])if(x.error)throw x.error;setBranches(b.data||[]);setMeds(m.data||[]);setBatches(st.data||[]);setLocations(l.data||[]);setSuppliers(su.data||[]);setCounts(c.data||[]);setClaims(cl.data||[]);setReminders(rr.data||[]);setBranch(x=>x||activeTenant?.branch_id||b.data?.[0]?.id||'');
- }catch(e){toast.error(e.message||'Could not load stock controls')}finally{setBusy(false)}}
+ ]);for(const x of [b,m,st,l,su,c,cl,rr])if(x.error)throw x.error;if(request!==loadRequest.current)return;setBranches(b.data||[]);setMeds(m.data||[]);setBatches(st.data||[]);setLocations(l.data||[]);setSuppliers(su.data||[]);setCounts(c.data||[]);setClaims(cl.data||[]);setReminders(rr.data||[]);setBranch(x=>x||activeTenant?.branch_id||b.data?.[0]?.id||'');
+ }catch(e){if(request===loadRequest.current)toast.error(e.message||'Could not load stock controls')}finally{if(request===loadRequest.current)setBusy(false)}}
+ useEffect(()=>{loadRequest.current++;setBranch(activeTenant?.branch_id||'');setBranches([]);setMeds([]);setBatches([]);setLocations([]);setSuppliers([]);setCounts([]);setClaims([]);setReminders([]);setCountId('');setCountRows([])},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId]);
  const branchBatches=batches.filter(x=>x.branch_id===branch);
  async function run(fn,msg){setBusy(true);try{await fn();toast.success(msg);await load()}catch(e){toast.error(e.message||'Action failed')}finally{setBusy(false)}}

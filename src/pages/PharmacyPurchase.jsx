@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,9 +35,11 @@ export default function PharmacyPurchase() {
  const [lines,setLines] = useState([blankLine()]);
  const [busy,setBusy] = useState(false);
  const [medicineSearch,setMedicineSearch] = useState({});
+ const loadRequest=useRef(0);
 
  async function load() {
-  if(!tenantId) return;
+  if(!tenantId){setBranches([]);setSuppliers([]);setMedicines([]);setBills([]);setBusy(false);return;}
+  const request=++loadRequest.current;
   setBusy(true);
   try {
    const [b,s,m,p] = await Promise.all([
@@ -47,11 +49,13 @@ export default function PharmacyPurchase() {
     db.from('pharmacy_purchase_orders').select('id,branch_id,supplier_id,order_number,supplier_invoice_number,supplier_invoice_date,received_date,total,status').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(100)
    ]);
    for(const x of [b,s,m,p]) if(x.error) throw x.error;
+   if(request!==loadRequest.current)return;
    setBranches(b.data||[]); setSuppliers(s.data||[]); setMedicines(m.data||[]); setBills(p.data||[]);
    setBranch(x=>x||activeTenant?.branch_id||b.data?.[0]?.id||'');
-  } catch(e) { toast.error(e.message || 'Unable to load purchase data'); }
-  finally { setBusy(false); }
+  } catch(e) { if(request===loadRequest.current)toast.error(e.message || 'Unable to load purchase data'); }
+  finally { if(request===loadRequest.current)setBusy(false); }
  }
+ useEffect(()=>{loadRequest.current++;setBranch(activeTenant?.branch_id||'');setBranches([]);setSuppliers([]);setMedicines([]);setBills([]);setSupplier('');setLines([blankLine()]);setMedicineSearch({})},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId]);
 
  const updateLine = (key,patch) => setLines(xs=>xs.map(x=>x.key===key?{...x,...patch}:x));

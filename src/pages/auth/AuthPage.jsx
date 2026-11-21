@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { supabase, requireSupabase } from '@/lib/supabase';
 import AuthLayout from './AuthLayout';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,10 @@ import { Label } from '@/components/ui/label';
 
 export default function AuthPage({ mode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile: profileParam } = useParams();
+  const redirectTarget = new URLSearchParams(location.search).get('redirect');
+  const safeRedirect = redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//') ? redirectTarget : null;
   const [email,setEmail] = useState('');
   const [password,setPassword] = useState('');
   const [confirmPassword,setConfirmPassword] = useState('');
@@ -33,26 +36,33 @@ export default function AuthPage({ mode }) {
           options: {
             data: { full_name: fullName.trim() },
             // Return confirmation links to the deployed web app, not a localhost default.
-            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+            emailRedirectTo: `${window.location.origin}${safeRedirect || `${import.meta.env.BASE_URL}accept-invite`}`,
           },
         });
         if (authError) throw authError;
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
-          const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-          navigate(!patientLinkError && linkedPatient ? '/pharmacy-order' : '/demo-workspace', { replace: true });
+          navigate(safeRedirect || '/accept-invite', { replace: true });
         } else {
-          setNotice('Check your email to confirm your account. After confirmation, sign in and open /demo-workspace to claim the synthetic testing workspace.');
+          setNotice('Check your email to confirm your account. After confirmation, sign in using the invitation sent by your organisation administrator. Workspace access requires an approved invitation.');
         }
       } else {
         const { error: authError } = await client.auth.signInWithPassword({
           email: email.trim().toLowerCase(), password,
         });
         if (authError) throw authError;
-        const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-        if (!patientLinkError && linkedPatient) { navigate('/pharmacy-order', { replace: true }); return; }
-        const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
-        navigate(membershipRows?.length ? '/' : '/demo-workspace', { replace: true });
+        if (safeRedirect) { navigate(safeRedirect,{replace:true}); return; }
+        const {data:sessionData}=await client.auth.getUser();
+        const userId=sessionData.user?.id;
+        if(!userId)throw new Error('Sign in completed but user identity is unavailable');
+        const {data:doctorRows,error:doctorError}=await client.from('doctor_profiles').select('id').eq('user_id',userId).eq('status','active').limit(2);
+        if(doctorError)throw doctorError;
+        if(doctorRows?.length===1){navigate('/doctor-portal',{replace:true});return;}
+        if(doctorRows?.length>1)throw new Error('Multiple doctor profiles are linked to this account. Contact your clinic administrator.');
+        const {data:patientRow,error:patientError}=await client.rpc('get_my_patient_profile');
+        if(!patientError&&patientRow){navigate('/patient-portal',{replace:true});return;}
+        const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',userId).eq('status','active').limit(1);
+        navigate(membershipRows?.length ? '/' : '/accept-invite', { replace: true });
       }
     } catch (e) {
       setError(e?.message || 'Authentication failed.');

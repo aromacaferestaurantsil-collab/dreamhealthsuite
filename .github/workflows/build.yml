@@ -16,6 +16,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Test business logic
+        run: npm test
       - name: Build web application
         run: npm run build
         env:
