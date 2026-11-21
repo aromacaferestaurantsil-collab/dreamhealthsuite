@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,9 +31,11 @@ export default function PharmacyGrowth(){
  const [transactions,setTransactions]=useState([]);
  const [referrals,setReferrals]=useState([]);
  const [form,setForm]=useState(emptyCampaign);
+ const loadRequest=useRef(0);
 
  async function load(){
-  if(!tenantId)return; setLoading(true);
+  if(!tenantId){setCampaigns([]);setTransactions([]);setReferrals([]);setLoading(false);return;}
+  const request=++loadRequest.current;setLoading(true);
   try{
    const [p,c,t,r]=await Promise.all([
     db.from('pharmacy_loyalty_programs').select('*').eq('tenant_id',tenantId).is('branch_id',branchId).maybeSingle(),
@@ -42,11 +44,13 @@ export default function PharmacyGrowth(){
     db.from('pharmacy_referrals').select('id,referral_code,referral_status,reward_points,reward_type,reward_amount,created_at,released_at,reversed_at').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(100)
    ]);
    for(const x of [p,c,t,r])if(x.error)throw x.error;
+   if(request!==loadRequest.current)return;
    if(p.data)setProgram({is_enabled:p.data.is_enabled,earn_points_per_currency:String(p.data.earn_points_per_currency),redemption_value_per_point:String(p.data.redemption_value_per_point),minimum_redemption_points:String(p.data.minimum_redemption_points),points_expiry_days:p.data.points_expiry_days?String(p.data.points_expiry_days):'',max_redemption_percent:String(p.data.max_redemption_percent)});
    setCampaigns(c.data||[]);setTransactions(t.data||[]);setReferrals(r.data||[]);
-  }catch(e){toast.error(e.message||'Unable to load growth settings')}
-  finally{setLoading(false)}
+  }catch(e){if(request===loadRequest.current)toast.error(e.message||'Unable to load growth settings')}
+  finally{if(request===loadRequest.current)setLoading(false)}
  }
+ useEffect(()=>{loadRequest.current++;setCampaigns([]);setTransactions([]);setReferrals([]);setProgram({is_enabled:false,earn_points_per_currency:'0.01',redemption_value_per_point:'1',minimum_redemption_points:'100',points_expiry_days:'',max_redemption_percent:'10'})},[tenantId,branchId]);
  useEffect(()=>{load()},[tenantId,branchId]);
 
  const balance=useMemo(()=>transactions.reduce((n,t)=>n+(t.transaction_type==='earned'||t.transaction_type==='adjusted'?Number(t.points):t.transaction_type==='reversed'||t.transaction_type==='redeemed'||t.transaction_type==='expired'?-Number(t.points):0),0),[transactions]);
