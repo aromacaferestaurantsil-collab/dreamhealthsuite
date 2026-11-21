@@ -41,7 +41,7 @@ export default function PharmacyPOS() {
       const db=requireSupabase();
       const [b,m,p]=await Promise.all([
         db.from('branches').select('id,name,branch_code').eq('tenant_id',tenantId).eq('status','active').order('name'),
-        db.from('medicine_catalogue').select('id,name,generic_name,brand,strength,dosage_form,gst_rate,prescription_required,units_per_pack,allow_loose_sale,unit,status').eq('tenant_id',tenantId).eq('status','active').order('name').limit(500),
+        db.from('medicine_catalogue').select('id,name,sku,barcode,generic_name,brand,strength,dosage_form,gst_rate,prescription_required,units_per_pack,allow_loose_sale,unit,status').eq('tenant_id',tenantId).eq('status','active').order('name').limit(500),
         db.from('patients').select('id,patient_code,full_name,phone,branch_id').eq('tenant_id',tenantId).eq('status','active').order('full_name').limit(1000),
       ]);
       if(b.error) throw b.error; if(m.error) throw m.error; if(p.error) throw p.error;
@@ -70,7 +70,7 @@ export default function PharmacyPOS() {
   }
   const availableFor = medicineId => getAvailableBatches(stock,holds,medicineId,new Date());
   const requiresPrescription = cartRequiresPrescription(cart,medicines);
-  const filtered=useMemo(()=>medicines.filter(m=>[m.name,m.generic_name,m.brand,m.strength].some(v=>String(v??'').toLowerCase().includes(search.toLowerCase()))),[medicines,search]);
+  const filtered=useMemo(()=>medicines.filter(m=>[m.name,m.generic_name,m.brand,m.strength,m.sku,m.barcode].some(v=>String(v??'').toLowerCase().includes(search.toLowerCase()))),[medicines,search]);
   const lineSubtotal = line => getFefoLineSubtotal(line.quantity,availableFor(line.medicineId)).subtotal;
   const subtotal=cart.reduce((n,x)=>n+lineSubtotal(x),0);
   const tax=cart.reduce((n,x)=>n+lineSubtotal(x)*x.gst/100,0);
@@ -111,7 +111,7 @@ export default function PharmacyPOS() {
     <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
       <Card><CardHeader><CardTitle>Medicine catalogue</CardTitle></CardHeader><CardContent className="space-y-3">
         <select aria-label="Branch" value={branchId} onChange={e=>{inventoryRequest.current++;setStock([]);setHolds([]);setBranchId(e.target.value);setCart([]);setPatientId('');setPrescriptionReference('');setPaymentConfirmed(false);}} className="w-full rounded-md border bg-background p-2 text-sm"><option value="">Select branch</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name} · {b.branch_code}</option>)}</select>
-        <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search medicine, brand or strength" />
+        <Input autoFocus value={search} onChange={e=>setSearch(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){const code=search.trim().toLowerCase();const exact=medicines.find(m=>String(m.barcode||'').toLowerCase()===code||String(m.sku||'').toLowerCase()===code);if(exact){e.preventDefault();add(exact);setSearch('');}}}} placeholder="Search or scan barcode / SKU" />
         {loading?<p className="text-sm text-muted-foreground">Loading inventory…</p>:<div className="max-h-[560px] space-y-2 overflow-auto">{filtered.map(m=>{const available=availableFor(m.id).reduce((n,b)=>n+b.available,0);return <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border p-3"><div className="min-w-0"><div className="font-semibold">{m.name} {m.strength}</div><div className="text-xs text-muted-foreground">{m.brand??m.generic_name??m.dosage_form??'Medicine'} · Stock {available}</div></div><Button size="sm" disabled={!available || !branchId} onClick={()=>add(m)}>Add</Button></div>;})}{!filtered.length&&<p className="text-sm text-muted-foreground">No medicines found.</p>}</div>}
       </CardContent></Card>
       <Card><CardHeader><CardTitle>Current sale</CardTitle></CardHeader><CardContent className="space-y-3">
