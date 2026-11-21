@@ -12,7 +12,7 @@ declare
 begin
  if v_user is null then raise exception 'Authentication required'; end if;
 
- select lr into r
+ select lr.* into r
  from public.lab_results lr
  where lr.id=p_result_id
  for update;
