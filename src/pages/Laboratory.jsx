@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
-import { verifyLabResult } from '@/services/healthsuite';
+import { verifyLabResult, labCreateSample, labUpdateSampleStatus, labEnterResult } from '@/services/healthsuite';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -32,6 +33,9 @@ export default function Laboratory() {
   const [bookings, setBookings] = useState([]);
   const [samples, setSamples] = useState([]);
   const [results, setResults] = useState([]);
+  const [bookingItems, setBookingItems] = useState([]);
+  const [sampleForm, setSampleForm] = useState({ bookingItemId: '', sampleCode: '', specimenType: '' });
+  const [resultForm, setResultForm] = useState({ bookingItemId: '', resultText: '', abnormalFlag: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [verifyingId, setVerifyingId] = useState('');
@@ -45,15 +49,17 @@ export default function Laboratory() {
     setError('');
     try {
       const db = requireSupabase();
-      const [testRes, bookingRes, sampleRes, resultRes] = await Promise.all([
+      const [testRes, bookingRes, itemRes, sampleRes, resultRes] = await Promise.all([
         db.from('lab_test_catalogue').select('id,test_code,name,department,specimen_type,price,turnaround_hours,status,created_at').eq('tenant_id', tenantId).order('name').limit(500),
         db.from('lab_bookings').select('id,booking_number,booking_status,booked_at,scheduled_at,total_amount,payment_status,patient_id').eq('tenant_id', tenantId).order('booked_at', { ascending: false }).limit(200),
+        db.from('lab_booking_items').select('id,booking_id,test_id,item_status').eq('tenant_id', tenantId).limit(500),
         db.from('lab_samples').select('id,booking_item_id,sample_code,specimen_type,sample_status,collected_at,received_at,rejection_reason').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(200),
         db.from('lab_results').select('id,booking_item_id,result_text,abnormal_flag,result_status,verified_by,verified_at,released_at,created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(200),
       ]);
-      for (const result of [testRes, bookingRes, sampleRes, resultRes]) if (result.error) throw result.error;
+      for (const result of [testRes, bookingRes, itemRes, sampleRes, resultRes]) if (result.error) throw result.error;
       setTests(testRes.data || []);
       setBookings(bookingRes.data || []);
+      setBookingItems(itemRes.data || []);
       setSamples(sampleRes.data || []);
       setResults(resultRes.data || []);
     } catch (e) {
@@ -94,6 +100,68 @@ export default function Laboratory() {
       await load();
     } catch (e) {
       toast.error(e.message || 'Could not save test');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const bookingItemLabel = item => {
+    const booking = bookings.find(b => b.id === item.booking_id);
+    const test = tests.find(t => t.id === item.test_id);
+    return `${booking?.booking_number || 'Booking'} · ${test?.name || 'Test'}`;
+  };
+
+  async function createSample(event) {
+    event.preventDefault();
+    if (!sampleForm.bookingItemId || !sampleForm.sampleCode.trim() || !sampleForm.specimenType.trim()) {
+      toast.error('Select a booking item and enter the sample code and specimen type.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await labCreateSample({ tenantId, bookingItemId: sampleForm.bookingItemId, sampleCode: sampleForm.sampleCode, specimenType: sampleForm.specimenType });
+      toast.success('Sample registered.');
+      setSampleForm({ bookingItemId: '', sampleCode: '', specimenType: '' });
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Could not register sample');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeSampleStatus(sampleId, newStatus) {
+    setSaving(true);
+    try {
+      await labUpdateSampleStatus({ tenantId, sampleId, newStatus });
+      toast.success(`Sample marked ${newStatus}.`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Could not update sample status');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveResult(event) {
+    event.preventDefault();
+    if (!resultForm.bookingItemId || !resultForm.resultText.trim()) {
+      toast.error('Select a processed booking item and enter the result.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await labEnterResult({
+        tenantId,
+        bookingItemId: resultForm.bookingItemId,
+        resultText: resultForm.resultText,
+        abnormalFlag: resultForm.abnormalFlag,
+      });
+      toast.success('Result entered and sent to the pathologist verification queue.');
+      setResultForm({ bookingItemId: '', resultText: '', abnormalFlag: false });
+      await load();
+    } catch (e) {
+      toast.error(e.message || 'Could not enter result');
     } finally {
       setSaving(false);
     }
@@ -187,18 +255,49 @@ export default function Laboratory() {
         </tbody></table>{!bookings.length && <p className="py-8 text-center text-sm text-muted-foreground">No bookings found.</p>}</div>
       </CardContent></Card></TabsContent>
 
-      <TabsContent value="samples"><Card><CardHeader><CardTitle className="text-base">Sample chain of custody</CardTitle></CardHeader><CardContent>
-        <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Sample code</th><th>Specimen</th><th>Collected</th><th>Received</th><th>Status</th></tr></thead><tbody className="divide-y">
-          {samples.map(s => <tr key={s.id}><td className="py-3 font-semibold">{s.sample_code}</td><td>{s.specimen_type || '—'}</td><td>{dateTime(s.collected_at)}</td><td>{dateTime(s.received_at)}</td><td><Badge variant={statusTone(s.sample_status)}>{s.sample_status}</Badge></td></tr>)}
-        </tbody></table>{!samples.length && <p className="py-8 text-center text-sm text-muted-foreground">No samples are recorded yet.</p>}</div>
-      </CardContent></Card></TabsContent>
+      <TabsContent value="samples" className="space-y-4">
+        <Card><CardHeader><CardTitle className="text-base">Register a sample</CardTitle></CardHeader><CardContent>
+          <form onSubmit={createSample} className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-1"><Label>Booking item</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={sampleForm.bookingItemId} onChange={e => setSampleForm(v => ({ ...v, bookingItemId: e.target.value }))} required>
+              <option value="">Select booking item</option>
+              {bookingItems.filter(i => !samples.some(s => s.booking_item_id === i.id)).map(i => <option key={i.id} value={i.id}>{bookingItemLabel(i)}</option>)}
+            </select></div>
+            <div className="space-y-1"><Label>Sample code</Label><Input value={sampleForm.sampleCode} onChange={e => setSampleForm(v => ({ ...v, sampleCode: e.target.value }))} required maxLength={80} /></div>
+            <div className="space-y-1"><Label>Specimen type</Label><Input value={sampleForm.specimenType} onChange={e => setSampleForm(v => ({ ...v, specimenType: e.target.value }))} required maxLength={80} /></div>
+            <div className="md:col-span-3"><Button type="submit" disabled={saving || !sampleForm.bookingItemId}>Register sample</Button></div>
+          </form>
+        </CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Sample chain of custody</CardTitle></CardHeader><CardContent>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Sample code</th><th>Booking item</th><th>Specimen</th><th>Collected</th><th>Received</th><th>Status</th><th>Next action</th></tr></thead><tbody className="divide-y">
+            {samples.map(s => <tr key={s.id}><td className="py-3 font-semibold">{s.sample_code}</td><td>{bookingItemLabel(bookingItems.find(i => i.id === s.booking_item_id) || {})}</td><td>{s.specimen_type || '—'}</td><td>{dateTime(s.collected_at)}</td><td>{dateTime(s.received_at)}</td><td><Badge variant={statusTone(s.sample_status)}>{s.sample_status}</Badge></td><td>
+              {s.sample_status === 'pending' ? <Button size="sm" variant="outline" disabled={saving} onClick={() => changeSampleStatus(s.id, 'collected')}>Collect</Button> :
+               s.sample_status === 'collected' ? <Button size="sm" variant="outline" disabled={saving} onClick={() => changeSampleStatus(s.id, 'received')}>Receive</Button> :
+               s.sample_status === 'received' ? <Button size="sm" variant="outline" disabled={saving} onClick={() => changeSampleStatus(s.id, 'processed')}>Mark processed</Button> :
+               <span className="text-xs text-muted-foreground">—</span>}
+            </td></tr>)}
+          </tbody></table>{!samples.length && <p className="py-8 text-center text-sm text-muted-foreground">No samples are recorded yet.</p>}</div>
+        </CardContent></Card>
+      </TabsContent>
 
-      <TabsContent value="results"><Card><CardHeader><CardTitle className="text-base">Result verification and release</CardTitle></CardHeader><CardContent>
-        <p className="mb-4 text-sm text-muted-foreground">Verification is performed by the protected database function. The server checks the user's role and prevents the result author from verifying their own result.</p>
-        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Result</th><th>Abnormal flag</th><th>Status</th><th>Verified</th><th>Released</th><th>Action</th></tr></thead><tbody className="divide-y">
-          {results.map(r => <tr key={r.id}><td className="py-3 font-semibold">{r.id.slice(0, 8)}</td><td>{r.abnormal_flag ? <Badge variant="destructive">Abnormal</Badge> : 'No flag'}</td><td><Badge variant={statusTone(r.result_status)}>{r.result_status}</Badge></td><td>{dateTime(r.verified_at)}</td><td>{dateTime(r.released_at)}</td><td>{isPathologist && r.result_status === 'entered' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, false)}>{verifyingId === r.id ? 'Verifying…' : 'Verify result'}</Button> : isPathologist && r.result_status === 'verified' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, true)}>{verifyingId === r.id ? 'Releasing…' : 'Release report'}</Button> : <span className="text-xs text-muted-foreground">{r.result_status === 'released' ? 'Released' : r.result_status === 'draft' ? 'Awaiting result entry' : 'Pathologist action required'}</span>}</td></tr>)}
-        </tbody></table>{!results.length && <p className="py-8 text-center text-sm text-muted-foreground">No result records found.</p>}</div>
-      </CardContent></Card></TabsContent>
+      <TabsContent value="results" className="space-y-4">
+        <Card><CardHeader><CardTitle className="text-base">Enter test result</CardTitle></CardHeader><CardContent>
+          <form onSubmit={saveResult} className="space-y-3">
+            <div className="space-y-1"><Label>Processed booking item</Label><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={resultForm.bookingItemId} onChange={e => setResultForm(v => ({ ...v, bookingItemId: e.target.value }))} required>
+              <option value="">Select processed test</option>
+              {bookingItems.filter(i => samples.some(s => s.booking_item_id === i.id && s.sample_status === 'processed') && !results.some(r => r.booking_item_id === i.id)).map(i => <option key={i.id} value={i.id}>{bookingItemLabel(i)}</option>)}
+            </select></div>
+            <div className="space-y-1"><Label>Result / observations</Label><Textarea rows={4} value={resultForm.resultText} onChange={e => setResultForm(v => ({ ...v, resultText: e.target.value }))} required placeholder="Enter the measured value and interpretation" /></div>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={resultForm.abnormalFlag} onChange={e => setResultForm(v => ({ ...v, abnormalFlag: e.target.checked }))} /> Flag as abnormal</label>
+            <Button type="submit" disabled={saving || !resultForm.bookingItemId}>Save result for independent verification</Button>
+          </form>
+        </CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">Result verification and release</CardTitle></CardHeader><CardContent>
+          <p className="mb-4 text-sm text-muted-foreground">Results are entered only after a sample is processed. A separate pathologist verifies and releases each report.</p>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Result</th><th>Abnormal flag</th><th>Status</th><th>Verified</th><th>Released</th><th>Action</th></tr></thead><tbody className="divide-y">
+            {results.map(r => <tr key={r.id}><td className="py-3 font-semibold">{r.id.slice(0, 8)}</td><td>{r.abnormal_flag ? <Badge variant="destructive">Abnormal</Badge> : 'No flag'}</td><td><Badge variant={statusTone(r.result_status)}>{r.result_status}</Badge></td><td>{dateTime(r.verified_at)}</td><td>{dateTime(r.released_at)}</td><td>{isPathologist && r.result_status === 'entered' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, false)}>{verifyingId === r.id ? 'Verifying…' : 'Verify result'}</Button> : isPathologist && r.result_status === 'verified' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, true)}>{verifyingId === r.id ? 'Releasing…' : 'Release report'}</Button> : <span className="text-xs text-muted-foreground">{r.result_status === 'released' ? 'Released' : r.result_status === 'draft' ? 'Awaiting result entry' : 'Pathologist action required'}</span>}</td></tr>)}
+          </tbody></table>{!results.length && <p className="py-8 text-center text-sm text-muted-foreground">No result records found.</p>}</div>
+        </CardContent></Card>
+      </TabsContent>
     </Tabs>
 
     <Card><CardHeader><CardTitle className="text-base">Clinical safety and current scope</CardTitle></CardHeader><CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
