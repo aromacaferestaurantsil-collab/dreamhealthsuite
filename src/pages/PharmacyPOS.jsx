@@ -31,9 +31,11 @@ export default function PharmacyPOS() {
   const [loading,setLoading] = useState(false);
   const [saving,setSaving] = useState(false);
   const inventoryRequest = useRef(0);
+  const catalogueRequest = useRef(0);
 
   async function load() {
-    if(!tenantId) return;
+    if(!tenantId) { setBranches([]);setMedicines([]);setPatients([]);setLoading(false);return; }
+    const request=++catalogueRequest.current;
     setLoading(true);
     try {
       const db=requireSupabase();
@@ -43,14 +45,15 @@ export default function PharmacyPOS() {
         db.from('patients').select('id,patient_code,full_name,phone,branch_id').eq('tenant_id',tenantId).eq('status','active').order('full_name').limit(1000),
       ]);
       if(b.error) throw b.error; if(m.error) throw m.error; if(p.error) throw p.error;
+      if(request!==catalogueRequest.current)return;
       const nextBranches=b.data??[];
       const selected=nextBranches.some(x=>x.id===branchId)?branchId:(nextBranches.some(x=>x.id===activeTenant?.branch_id)?activeTenant.branch_id:(nextBranches[0]?.id||''));
       setBranches(nextBranches); setMedicines(m.data??[]); setPatients(p.data??[]); setBranchId(selected);
       if(!selected){setStock([]);setHolds([]);}
-    } catch(e) { toast.error(e.message || 'Unable to load pharmacy data'); }
-    finally { setLoading(false); }
+    } catch(e) { if(request===catalogueRequest.current)toast.error(e.message || 'Unable to load pharmacy data'); }
+    finally { if(request===catalogueRequest.current)setLoading(false); }
   }
-  useEffect(()=>{setBranchId(activeTenant?.branch_id??'');setCart([]);setStock([]);setHolds([]);load();},[tenantId]);
+  useEffect(()=>{catalogueRequest.current++;inventoryRequest.current++;setBranchId(activeTenant?.branch_id??'');setCart([]);setStock([]);setHolds([]);setBranches([]);setMedicines([]);setPatients([]);setPatientId('');setPrescriptionReference('');setPaymentConfirmed(false);load();},[tenantId]);
   useEffect(()=>{if(!tenantId||!branchId)return;loadInventory();},[tenantId,branchId]);
 
   async function loadInventory(){
