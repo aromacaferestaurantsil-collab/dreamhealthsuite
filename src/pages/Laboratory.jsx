@@ -67,6 +67,7 @@ export default function Laboratory() {
 
   const resultCounts = useMemo(() => ({
     draft: results.filter(r => r.result_status === 'draft').length,
+    entered: results.filter(r => r.result_status === 'entered').length,
     verified: results.filter(r => r.result_status === 'verified').length,
     released: results.filter(r => r.result_status === 'released').length,
   }), [results]);
@@ -111,7 +112,7 @@ export default function Laboratory() {
     }
   }
 
-  const isPathologist = user?.role === 'pathologist';
+  const isPathologist = String(user?.role || '').toLowerCase() === 'pathologist';
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <section className="rounded-2xl bg-primary px-6 py-7 text-primary-foreground">
@@ -135,7 +136,7 @@ export default function Laboratory() {
       <Stat label="Active tests" value={tests.filter(t => t.status === 'active').length} />
       <Stat label="Bookings" value={bookings.length} />
       <Stat label="Samples" value={samples.length} />
-      <Stat label="Awaiting verification" value={resultCounts.draft} />
+      <Stat label="Awaiting verification" value={resultCounts.entered} />
       <Stat label="Released reports" value={resultCounts.released} />
     </div>
 
@@ -195,7 +196,7 @@ export default function Laboratory() {
       <TabsContent value="results"><Card><CardHeader><CardTitle className="text-base">Result verification and release</CardTitle></CardHeader><CardContent>
         <p className="mb-4 text-sm text-muted-foreground">Verification is performed by the protected database function. The server checks the user's role and prevents the result author from verifying their own result.</p>
         <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-b text-xs text-muted-foreground"><tr><th className="py-3">Result</th><th>Abnormal flag</th><th>Status</th><th>Verified</th><th>Released</th><th>Action</th></tr></thead><tbody className="divide-y">
-          {results.map(r => <tr key={r.id}><td className="py-3 font-semibold">{r.id.slice(0, 8)}</td><td>{r.abnormal_flag ? <Badge variant="destructive">Abnormal</Badge> : 'No flag'}</td><td><Badge variant={statusTone(r.result_status)}>{r.result_status}</Badge></td><td>{dateTime(r.verified_at)}</td><td>{dateTime(r.released_at)}</td><td>{isPathologist && r.result_status === 'draft' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, true)}>{verifyingId === r.id ? 'Verifying…' : 'Verify & release'}</Button> : <span className="text-xs text-muted-foreground">{r.result_status === 'released' ? 'Released' : 'Pathologist action required'}</span>}</td></tr>)}
+          {results.map(r => <tr key={r.id}><td className="py-3 font-semibold">{r.id.slice(0, 8)}</td><td>{r.abnormal_flag ? <Badge variant="destructive">Abnormal</Badge> : 'No flag'}</td><td><Badge variant={statusTone(r.result_status)}>{r.result_status}</Badge></td><td>{dateTime(r.verified_at)}</td><td>{dateTime(r.released_at)}</td><td>{isPathologist && r.result_status === 'entered' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, false)}>{verifyingId === r.id ? 'Verifying…' : 'Verify result'}</Button> : isPathologist && r.result_status === 'verified' ? <Button size="sm" disabled={verifyingId === r.id} onClick={() => verifyResult(r.id, true)}>{verifyingId === r.id ? 'Releasing…' : 'Release report'}</Button> : <span className="text-xs text-muted-foreground">{r.result_status === 'released' ? 'Released' : r.result_status === 'draft' ? 'Awaiting result entry' : 'Pathologist action required'}</span>}</td></tr>)}
         </tbody></table>{!results.length && <p className="py-8 text-center text-sm text-muted-foreground">No result records found.</p>}</div>
       </CardContent></Card></TabsContent>
     </Tabs>
