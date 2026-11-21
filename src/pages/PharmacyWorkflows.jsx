@@ -32,7 +32,7 @@ export default function PharmacyWorkflows(){
  const [returnForm,setReturnForm]=useState({type:'customer_return',sale:'',supplier:'',batch:'',quantity:'',restock:true,reason:''});
  const [purchaseOrders,setPurchaseOrders]=useState([]); const [purchaseItems,setPurchaseItems]=useState([]);
  const [expenses,setExpenses]=useState([]); const [batches,setBatches]=useState([]); const [medicines,setMedicines]=useState([]);
- const [holds,setHolds]=useState([]); const [supplierBalances,setSupplierBalances]=useState([]);
+ const [holds,setHolds]=useState([]); const [supplierBalances,setSupplierBalances]=useState([]); const [suppliers,setSuppliers]=useState([]);
  const [controlled,setControlled]=useState([]); const [suggestions,setSuggestions]=useState([]); const [referrals,setReferrals]=useState([]);
  const [patients,setPatients]=useState([]); const [busy,setBusy]=useState(false);
  const [payExpense,setPayExpense]=useState({id:'',amount:'',method:'upi',reference:''});
@@ -48,7 +48,7 @@ export default function PharmacyWorkflows(){
  async function load(){
   if(!tenantId)return; setBusy(true);
   try{
-   const [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti]=await Promise.all([
+   const [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti,sup]=await Promise.all([
     db.from('branches').select('id,name').eq('tenant_id',tenantId).eq('status','active').order('name'),
     db.from('pharmacy_customer_orders').select('id,branch_id,patient_id,order_number,order_status,prescription_path,customer_notes,created_at').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(300),
     db.from('pharmacy_customer_order_items').select('*').eq('tenant_id',tenantId).limit(2000),
@@ -66,20 +66,21 @@ export default function PharmacyWorkflows(){
     db.from('pharmacy_sales').select('id,branch_id,invoice_number,grand_total,sale_status,created_at').eq('tenant_id',tenantId).eq('sale_status','completed').order('created_at',{ascending:false}).limit(500),
     db.from('pharmacy_sale_items').select('id,sale_id,medicine_id,batch_id,quantity,line_total').eq('tenant_id',tenantId).limit(2000),
     db.from('pharmacy_returns').select('id,branch_id,return_number,return_type,sale_id,supplier_id,reason,total_amount,status,created_at').eq('tenant_id',tenantId).order('created_at',{ascending:false}).limit(500),
-    db.from('pharmacy_return_items').select('id,return_id,medicine_id,batch_id,quantity,unit_amount,restock').eq('tenant_id',tenantId).limit(2000)
+    db.from('pharmacy_return_items').select('id,return_id,medicine_id,batch_id,quantity,unit_amount,restock').eq('tenant_id',tenantId).limit(2000),
+    db.from('pharmacy_suppliers').select('id,name,status').eq('tenant_id',tenantId).order('name').limit(500)
    ]);
-   for(const x of [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti]) if(x.error)throw x.error;
+   for(const x of [b,o,oi,po,pi,e,ba,m,h,sb,cd,ph,rf,pt,sa,sai,ret,reti,sup]) if(x.error)throw x.error;
    setBranches(b.data||[]);setBranch(x=>x||activeTenant?.branch_id||b.data?.[0]?.id||'');
    setOrders(o.data||[]);setOrderItems(oi.data||[]);setPurchaseOrders(po.data||[]);setPurchaseItems(pi.data||[]);
    setExpenses(e.data||[]);setBatches(ba.data||[]);setMedicines(m.data||[]);setHolds(h.data||[]);
-   setSupplierBalances(sb.data||[]);setControlled(cd.data||[]);setSuggestions(ph.data||[]);setReferrals(rf.data||[]);setPatients(pt.data||[]);
+   setSupplierBalances(sb.data||[]);setSuppliers(sup.data||[]);setControlled(cd.data||[]);setSuggestions(ph.data||[]);setReferrals(rf.data||[]);setPatients(pt.data||[]);
    setSales(sa.data||[]);setSaleItems(sai.data||[]);setReturns(ret.data||[]);setReturnItems(reti.data||[]);
   }catch(err){toast.error(err.message||'Could not load PharmaSuite workflows')}finally{setBusy(false)}
  }
  useEffect(()=>{setBranch(activeTenant?.branch_id||'')},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId,branch]);
  const scopedOrders=orders.filter(x=>x.branch_id===branch);
- const scopedSales=sales.filter(x=>x.branch_id===branch); const scopedReturns=returns.filter(x=>x.branch_id===branch); const scopedSuppliers=useMemo(()=>supplierBalances.filter(x=>x.branch_id===branch),[supplierBalances,branch]);
+ const scopedSales=sales.filter(x=>x.branch_id===branch); const scopedReturns=returns.filter(x=>x.branch_id===branch); const scopedSuppliers=suppliers.filter(x=>x.status==='active');
  const saleItemsFor=id=>saleItems.filter(x=>x.sale_id===id);
  const scopedPOs=purchaseOrders.filter(x=>x.branch_id===branch);
  const scopedExpenses=expenses.filter(x=>x.branch_id===branch);
