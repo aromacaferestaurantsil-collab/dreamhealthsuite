@@ -28,6 +28,27 @@ export async function pharmacyCheckout({tenantId,branchId,invoiceNumber,items,pa
   });
   if(error) throw error; return data;
 }
+
+export async function labCreateSample({tenantId,bookingItemId,sampleCode,specimenType}) {
+ const {data,error}=await requireSupabase().rpc('lab_create_sample',{
+  p_tenant_id:tenantId,p_booking_item_id:bookingItemId,p_sample_code:sampleCode,p_specimen_type:specimenType,
+ });
+ if(error) throw error; return data;
+}
+export async function labUpdateSampleStatus({tenantId,sampleId,newStatus,rejectionReason=null}) {
+ const {error}=await requireSupabase().rpc('lab_update_sample_status',{
+  p_tenant_id:tenantId,p_sample_id:sampleId,p_new_status:newStatus,p_rejection_reason:rejectionReason,
+ });
+ if(error) throw error;
+}
+export async function labEnterResult({tenantId,bookingItemId,resultText,resultData={},abnormalFlag=false}) {
+ const {data,error}=await requireSupabase().rpc('lab_enter_result',{
+  p_tenant_id:tenantId,p_booking_item_id:bookingItemId,p_result_text:resultText,
+  p_result_data:resultData,p_abnormal_flag:abnormalFlag,
+ });
+ if(error) throw error; return data;
+}
+
 export async function verifyLabResult(resultId,release=false) {
   const {error}=await requireSupabase().rpc('lab_verify_result',{p_result_id:resultId,p_release:release});
   if(error) throw error;
@@ -49,6 +70,17 @@ export async function pharmacyCreatePurchaseOrder({tenantId,branchId,supplierId,
  const {data,error}=await requireSupabase().rpc('pharmacy_create_purchase_order',{p_tenant_id:tenantId,p_branch_id:branchId,p_supplier_id:supplierId,p_order_number:orderNumber,p_order_date:orderDate,p_expected_date:expectedDate||null,p_items:items});
  if(error) throw error; return data;
 }
+
+export async function pharmacyReceiveOpeningBatch({tenantId,branchId,medicineId,supplierId,batchNumber,expiryDate,quantity,purchaseRate,mrp,sellingRate}) {
+ const {data,error}=await requireSupabase().rpc('pharmacy_receive_opening_batch',{
+  p_tenant_id:tenantId,p_branch_id:branchId,p_medicine_id:medicineId,p_supplier_id:supplierId||null,
+  p_batch_number:batchNumber,p_expiry_date:expiryDate,p_quantity:quantity,
+  p_purchase_rate:purchaseRate,p_mrp:mrp,p_selling_rate:sellingRate,
+ });
+ if(error) throw error;
+ return data;
+}
+
 export async function pharmacyReceivePurchaseItem({tenantId,orderId,itemId,quantity,batchNumber,expiryDate,mrp,sellingRate}) {
  const {data,error}=await requireSupabase().rpc('pharmacy_receive_purchase_item',{p_tenant_id:tenantId,p_order_id:orderId,p_item_id:itemId,p_quantity:quantity,p_batch_number:batchNumber,p_expiry_date:expiryDate,p_mrp:mrp,p_selling_rate:sellingRate});
  if(error) throw error; return data;

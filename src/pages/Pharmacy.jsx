@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
+import { pharmacyReceiveOpeningBatch } from '@/services/healthsuite';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -109,17 +110,11 @@ export default function Pharmacy() {
     setSaving(true);
     try {
       const qty=Number(batchForm.quantity_on_hand);
-      const {data,error}=await requireSupabase().from('medicine_batches').insert({
-        tenant_id:tenantId,branch_id:branchId,medicine_id:medicine.id,supplier_id:batchForm.supplier_id||null,
-        batch_number:batchForm.batch_number.trim(),expiry_date:batchForm.expiry_date,quantity_on_hand:qty,
-        purchase_rate:Number(batchForm.purchase_rate||0),mrp:Number(batchForm.mrp||0),selling_rate:Number(batchForm.selling_rate||0),
-      }).select('id').single();
-      if(error) throw error;
-      const movement=await requireSupabase().from('pharmacy_stock_movements').insert({
-        tenant_id:tenantId,branch_id:branchId,medicine_id:medicine.id,batch_id:data.id,movement_type:'purchase',
-        quantity_delta:qty,reference_type:'opening_stock',notes:'Stock received from PharmaSuite batch intake',
+      await pharmacyReceiveOpeningBatch({
+        tenantId,branchId,medicineId:medicine.id,supplierId:batchForm.supplier_id,
+        batchNumber:batchForm.batch_number.trim(),expiryDate:batchForm.expiry_date,quantity:qty,
+        purchaseRate:Number(batchForm.purchase_rate||0),mrp:Number(batchForm.mrp||0),sellingRate:Number(batchForm.selling_rate||0),
       });
-      if(movement.error) throw movement.error;
       toast.success('Batch received and stock movement recorded');setBatchOpen(false);setBatchForm(blankBatch());await load();
     } catch(e){toast.error(e.message||'Unable to receive batch');}
     finally{setSaving(false);}
