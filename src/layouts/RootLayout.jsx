@@ -64,17 +64,14 @@ export default function RootLayout() {
       const rows = data ?? [];
       let portalProfile = '';
       try {
-        const [doctorResult, patientResult] = await Promise.all([
-          supabase.from('doctor_profiles').select('id,tenant_id').eq('user_id',sessionUser.id).eq('status','active').limit(2),
-          supabase.rpc('get_my_patient_profile')
-        ]);
+        const doctorResult = await supabase.from('doctor_profiles').select('id,tenant_id').eq('user_id',sessionUser.id).eq('status','active').limit(2);
         if (doctorResult.error) throw doctorResult.error;
         if (doctorResult.data?.length===1) portalProfile='Doctor';
         else if (doctorResult.data?.length>1) portalProfile='IdentityConflict';
-        if (patientResult.error && !/No patient|not linked|not found/i.test(patientResult.error.message||'')) throw patientResult.error;
-        if (patientResult.data) {
-          if (portalProfile) portalProfile='IdentityConflict';
-          else portalProfile='Patient';
+        if (!portalProfile && rows.length===0) {
+          const patientResult = await supabase.rpc('get_my_patient_profile');
+          if (patientResult.error && !/No patient|not linked|not found/i.test(patientResult.error.message||'')) throw patientResult.error;
+          if (patientResult.data) portalProfile='Patient';
         }
       } catch(e) {
         // A portal identity lookup failure must not grant portal access. Tenant workspace resolution continues.
