@@ -22,7 +22,7 @@ export default function OperationalModule({ config }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState('');
-  const [lookupRows, setLookupRows] = useState([]);
+  const [lookupRows, setLookupRows] = useState({});
   const entity = config.entities[active] || config.entities[0];
   const columns = useMemo(() => entity.fields.filter(f => f.list !== false).slice(0, 7), [entity]);
 
@@ -39,24 +39,28 @@ export default function OperationalModule({ config }) {
     } catch (e) { setError(e.message || 'Could not load records'); }
     finally { setLoading(false); }
   }
-  useEffect(() => { load(); }, [active, activeTenant?.tenant_id]);
   useEffect(() => {
     let alive = true;
     async function loadLookups() {
-      const lookup = entity.lookup;
-      if (!lookup || !activeTenant?.tenant_id) { setLookupRows([]); return; }
+      const lookups = entity.lookups || (entity.lookup ? [entity.lookup] : []);
+      const next = {};
       try {
-        let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,patient_code,full_name')
-          .eq('tenant_id', activeTenant.tenant_id).order(lookup.labelField || 'full_name').limit(500);
-        if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
-        const {data,error} = await query;
-        if (error) throw error;
-        if (alive) setLookupRows(data || []);
+        for (const lookup of lookups) {
+          let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name')
+            .eq('tenant_id', activeTenant.tenant_id)
+            .order(lookup.labelField || 'name').limit(500);
+          if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
+          const {data,error} = await query;
+          if (error) throw error;
+          next[lookup.field] = data || [];
+        }
+        if (alive) setLookupRows(next);
       } catch (e) {
-        if (alive) { setLookupRows([]); setError(e.message || 'Unable to load related records'); }
+        if (alive) { setLookupRows({}); setError(e.message || 'Unable to load related records'); }
       }
     }
-    loadLookups();
+    if (activeTenant?.tenant_id && (entity.lookup || entity.lookups)) loadLookups();
+    else setLookupRows({});
     return () => { alive = false; };
   }, [entity.table, activeTenant?.tenant_id, activeTenant?.branch_id]);
 
@@ -80,9 +84,11 @@ export default function OperationalModule({ config }) {
       }
       const missing = entity.fields.find(f => f.required && (payload[f.name] === undefined || payload[f.name] === null || payload[f.name] === ''));
       if (missing) throw new Error(missing.label + ' is required');
-      if (entity.lookup) {
-        const lookupValue = payload[entity.lookup.field];
-        if (!lookupRows.some(item => item.id === lookupValue)) throw new Error('Choose a valid related record from this workspace');
+      for (const lookup of (entity.lookups || (entity.lookup ? [entity.lookup] : []))) {
+        const lookupValue = payload[lookup.field];
+        const records = lookupRows[lookup.field] || [];
+        if (lookup.required !== false && !records.some(item => item.id === lookupValue)) throw new Error('Choose a valid ' + lookup.label + ' from this workspace');
+        if (lookupValue && !records.some(item => item.id === lookupValue)) throw new Error('Selected ' + lookup.label + ' is outside the active workspace');
       }
       if (entity.table === 'patient_consents' && payload.granted === false && !payload.withdrawn_at) {
         payload.withdrawn_at = new Date().toISOString();
@@ -149,7 +155,7 @@ export default function OperationalModule({ config }) {
           <form className="space-y-3" onSubmit={createRecord}>
             {entity.fields.filter(f => f.create !== false).map(field => <div key={field.name} className="space-y-1.5">
               <Label>{field.label}{field.required ? ' *' : ''}</Label>
-              {field.lookup ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{lookupRows.map(item => <SelectItem key={item.id} value={item.id}>{item[entity.lookup.labelField || 'full_name']}{item.patient_code ? ' · ' + item.patient_code : ''}</SelectItem>)}</SelectContent></Select>
+              {field.lookup ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{(lookupRows[field.name] || []).map(item => <SelectItem key={item.id} value={item.id}>{item[field.lookupLabelField || 'name'] || item.full_name || item.name || item.id}{item.patient_code ? ' · ' + item.patient_code : item.service_code ? ' · ' + item.service_code : ''}</SelectItem>)}</SelectContent></Select>
               : field.options ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{field.options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>
               : field.type === 'multiline' ? <textarea className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" value={values[field.name] || ''} onChange={e => setValues(old => ({ ...old, [field.name]: e.target.value }))} />
               : <Input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'datetime' ? 'datetime-local' : 'text'} step={field.type === 'number' ? '0.01' : undefined} value={values[field.name] || ''} onChange={e => setValues(old => ({ ...old, [field.name]: e.target.value }))} placeholder={field.placeholder || field.label} required={field.required} />}
