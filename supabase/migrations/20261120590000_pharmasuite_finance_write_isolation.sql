@@ -18,7 +18,7 @@ grant select on public.pharmacy_customer_ledger,public.pharmacy_distributor_ledg
  public.pharmacy_ledger_allocations,public.pharmacy_supplier_payments,
  public.pharmacy_expense_payments,public.pharmacy_cash_sessions,public.pharmacy_cashbook_entries to authenticated;
 
-create unique index if not exists pharmacy_cash_one_open_session_per_branch_uidx
+create unique index if not exists pharmacy_one_open_cash_session_per_branch
  on public.pharmacy_cash_sessions(tenant_id,branch_id) where status='open';
 create unique index if not exists pharmacy_customer_receipt_number_uidx
  on public.pharmacy_customer_ledger(tenant_id,branch_id,reference_number)
