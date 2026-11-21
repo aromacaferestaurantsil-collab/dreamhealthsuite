@@ -85,12 +85,51 @@ export default function PharmacyWorkflows(){
  const getBatch=id=>batches.find(x=>x.id===id);
  const currentOrderItems=id=>orderItems.filter(x=>x.order_id===id);
  async function run(action){setBusy(true);try{await action();await load()}catch(e){toast.error(e.message||'Workflow failed')}finally{setBusy(false)}}
- async function receiveGoods(e){e.preventDefault();const item=getItem(receive.item);const po=item&&getPO(item.purchase_order_id);if(!item||!po)return toast.error('Select a valid outstanding purchase item');await run(async()=>{await pharmacyReceivePurchaseItem({tenantId,orderId:po.id,itemId:item.id,quantity:Number(receive.quantity),batchNumber:receive.batch,expiryDate:receive.expiry,mrp:Number(receive.mrp),sellingRate:Number(receive.selling)});toast.success('Goods received, batch created and stock movement posted');setReceive({item:'',quantity:'',batch:'',expiry:'',mrp:'',selling:''})})}
- async function recordExpensePayment(e){e.preventDefault();await run(async()=>{await pharmacyRecordExpensePayment({tenantId,expenseId:payExpense.id,amount:Number(payExpense.amount),paymentMethod:payExpense.method,reference:payExpense.reference});toast.success('Expense payment recorded');setPayExpense({id:'',amount:'',method:'upi',reference:''})})}
- async function recordSupplierPayment(e){e.preventDefault();await run(async()=>{await pharmacyRecordSupplierPayment({tenantId,orderId:paySupplier.id,amount:Number(paySupplier.amount),paymentMethod:paySupplier.method,reference:paySupplier.reference});toast.success('Supplier payment allocated to purchase order');setPaySupplier({id:'',amount:'',method:'upi',reference:''})})}
- async function adjustStock(e){e.preventDefault();await run(async()=>{await pharmacyAdjustStock({tenantId,branchId:branch,batchId:adjustment.batch,quantityDelta:Number(adjustment.delta),reason:adjustment.reason});toast.success('Stock adjustment posted with audit trail');setAdjustment({batch:'',delta:'',reason:''})})}
- async function placeHold(e){e.preventDefault();await run(async()=>{await pharmacyPlaceStockHold({tenantId,branchId:branch,batchId:hold.batch,quantity:Number(hold.quantity),holdType:hold.type,reason:hold.reason,reference:hold.reference});toast.success('Stock quantity quarantined and unavailable to dispense');setHold({batch:'',quantity:'',type:'quarantine',reason:'',reference:''})})}
- async function reviewOrder(order,decision){const items=currentOrderItems(order.id).map(i=>({item_id:i.id,item_status:decision==='approved'?(i.item_status==='pending'?'approved':i.item_status):'rejected',suggested_medicine_id:i.suggested_medicine_id||null,note:i.pharmacist_note||null}));await run(async()=>{await pharmacyReviewCustomerOrder({tenantId,orderId:order.id,decision,notes:reviewNotes[order.id]||null,itemDecisions:items});toast.success('Order review saved')})}
+ async function receiveGoods(e){
+  e.preventDefault();
+  const item=getItem(receive.item); const po=item&&getPO(item.purchase_order_id);
+  const quantity=Number(receive.quantity), mrp=Number(receive.mrp), selling=Number(receive.selling);
+  if(!item||!po||po.branch_id!==branch)return toast.error('Select a valid outstanding purchase item for this branch');
+  const due=Number(item.quantity_ordered)-Number(item.quantity_received);
+  if(!Number.isFinite(quantity)||quantity<=0||quantity>due)return toast.error('Received quantity must be positive and cannot exceed the outstanding quantity');
+  if(!receive.batch.trim()||!receive.expiry||receive.expiry<today())return toast.error('Enter a batch number and a future expiry date');
+  if(!Number.isFinite(mrp)||!Number.isFinite(selling)||mrp<0||selling<0||selling>mrp)return toast.error('Enter valid rates. Selling rate cannot exceed MRP');
+  await run(async()=>{await pharmacyReceivePurchaseItem({tenantId,orderId:po.id,itemId:item.id,quantity,batchNumber:receive.batch.trim(),expiryDate:receive.expiry,mrp,sellingRate:selling});toast.success('Goods received and stock movement posted');setReceive({item:'',quantity:'',batch:'',expiry:'',mrp:'',selling:''})});
+ }
+ async function recordExpensePayment(e){
+  e.preventDefault(); const amount=Number(payExpense.amount);
+  if(!payExpense.id||!Number.isFinite(amount)||amount<=0)return toast.error('Choose an expense and enter a payment amount greater than zero');
+  const expense=scopedExpenses.find(x=>x.id===payExpense.id);
+  if(!expense)return toast.error('Selected expense is outside the active branch');
+  await run(async()=>{await pharmacyRecordExpensePayment({tenantId,expenseId:payExpense.id,amount,paymentMethod:payExpense.method,reference:payExpense.reference.trim()});toast.success('Expense payment recorded');setPayExpense({id:'',amount:'',method:'upi',reference:''})});
+ }
+ async function recordSupplierPayment(e){
+  e.preventDefault(); const amount=Number(paySupplier.amount);
+  const order=scopedPOs.find(x=>x.id===paySupplier.id);
+  if(!order||!Number.isFinite(amount)||amount<=0)return toast.error('Choose a purchase order and enter a payment amount greater than zero');
+  await run(async()=>{await pharmacyRecordSupplierPayment({tenantId,orderId:paySupplier.id,amount,paymentMethod:paySupplier.method,reference:paySupplier.reference.trim()});toast.success('Supplier payment allocated to purchase order');setPaySupplier({id:'',amount:'',method:'upi',reference:''})});
+ }
+ async function adjustStock(e){
+  e.preventDefault(); const delta=Number(adjustment.delta);
+  if(!adjustment.batch||!Number.isFinite(delta)||delta===0||!adjustment.reason.trim())return toast.error('Choose a batch, enter a non-zero adjustment and provide a reason');
+  if(!scopedBatches.some(x=>x.id===adjustment.batch))return toast.error('Selected batch is outside the active branch');
+  await run(async()=>{await pharmacyAdjustStock({tenantId,branchId:branch,batchId:adjustment.batch,quantityDelta:delta,reason:adjustment.reason.trim()});toast.success('Stock adjustment posted with audit trail');setAdjustment({batch:'',delta:'',reason:''})});
+ }
+ async function placeHold(e){
+  e.preventDefault(); const quantity=Number(hold.quantity);
+  const batch=scopedBatches.find(x=>x.id===hold.batch);
+  if(!batch||!Number.isFinite(quantity)||quantity<=0||!hold.reason.trim())return toast.error('Choose a batch, positive quantity and reason for the hold');
+  const activeHeld=scopedHolds.filter(x=>x.batch_id===batch.id&&x.hold_status==='active').reduce((n,x)=>n+Number(x.held_quantity||0),0);
+  if(quantity>Number(batch.quantity_on_hand)-activeHeld)return toast.error('Hold quantity exceeds the available unheld stock');
+  await run(async()=>{await pharmacyPlaceStockHold({tenantId,branchId:branch,batchId:hold.batch,quantity,holdType:hold.type,reason:hold.reason.trim(),reference:hold.reference.trim()});toast.success('Stock quantity quarantined and unavailable to dispense');setHold({batch:'',quantity:'',type:'quarantine',reason:'',reference:''})});
+ }
+ async function reviewOrder(order,decision){
+  if(!['approved','rejected'].includes(decision))return toast.error('Invalid order decision');
+  const items=currentOrderItems(order.id);
+  if(!items.length)return toast.error('This order has no line items to review');
+  const itemDecisions=items.map(i=>({item_id:i.id,item_status:decision==='approved'?(i.item_status==='pending'?'approved':i.item_status):'rejected',suggested_medicine_id:i.suggested_medicine_id||null,note:i.pharmacist_note||null}));
+  await run(async()=>{await pharmacyReviewCustomerOrder({tenantId,orderId:order.id,decision,notes:reviewNotes[order.id]||null,itemDecisions});toast.success('Order review saved')});
+ }
  async function openPrescription(path){if(!path)return;try{const {data,error}=await db.storage.from('pharmacy-prescriptions').createSignedUrl(path,300);if(error)throw error;window.open(data.signedUrl,'_blank','noopener,noreferrer')}catch(e){toast.error(e.message)}}
  async function recordDrug(e){e.preventDefault();await run(async()=>{await pharmacyRecordControlledDrug({tenantId,branchId:branch,medicineId:drug.medicine,batchId:drug.batch||null,transactionType:drug.type,quantityIn:Number(drug.in),quantityOut:Number(drug.out),patientId:drug.patient||null,prescriptionReference:drug.prescription||null,notes:drug.notes||null});toast.success('Scheduled-drug register entry saved');setDrug({...drug,notes:'',prescription:''})})}
  async function saveCatalogueMeta(e){e.preventDefault();if(!catalogueMeta.medicine)return toast.error('Choose a medicine');await run(async()=>{const {error}=await db.from('medicine_catalogue').update({barcode:catalogueMeta.barcode.trim()||null,schedule_code:catalogueMeta.schedule.trim()||null}).eq('tenant_id',tenantId).eq('id',catalogueMeta.medicine);if(error)throw error;toast.success('Barcode and schedule metadata saved');setCatalogueMeta({medicine:'',barcode:'',schedule:''})})}
