@@ -112,7 +112,7 @@ export default function Laboratory() {
     }
   }
 
-  const isPathologist = String(user?.role || '').toLowerCase() === 'pathologist';
+  const isPathologist = String(activeTenant?.role || user?.role || '').toLowerCase() === 'pathologist';
 
   return <div className="mx-auto max-w-7xl space-y-6">
     <section className="rounded-2xl bg-primary px-6 py-7 text-primary-foreground">
