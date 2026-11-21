@@ -16,7 +16,7 @@ export const route = { path: '/pharmacy', layout: 'owner', access: 'authenticate
 export const nav = { icon: 'Pill', label: 'Inventory', section: 'PharmaSuite · Inventory', order: 10, profiles: ['VendorOwner','VendorAdmin','Manager','Pharmacist'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const today = () => new Date().toISOString().slice(0,10);
+const today = () => { const date = new Date(); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0,10); };
 const blankMedicine = () => ({sku:'',name:'',generic_name:'',brand:'',strength:'',dosage_form:'Tablet',unit:'unit',hsn_code:'',gst_rate:'0',reorder_level:'10',units_per_pack:'1',allow_loose_sale:true,prescription_required:false,status:'active'});
 const blankSupplier = () => ({name:'',contact_person:'',phone:'',email:'',gstin:'',address:'',status:'active'});
 const blankBatch = () => ({medicine_id:'',supplier_id:'',batch_number:'',expiry_date:'',quantity_on_hand:'',purchase_rate:'',mrp:'',selling_rate:''});
