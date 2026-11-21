@@ -36,7 +36,7 @@ export default function AuthPage({ mode }) {
           options: {
             data: { full_name: fullName.trim() },
             // Return confirmation links to the deployed web app, not a localhost default.
-            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}${safeRedirect || '/accept-invite'}`,
+            emailRedirectTo: `${window.location.origin}${safeRedirect || `${import.meta.env.BASE_URL}accept-invite`}`,
           },
         });
         if (authError) throw authError;
