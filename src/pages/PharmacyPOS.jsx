@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 export const route = { path: '/pharmacy/pos', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'ShoppingCart', label: 'Sale', section: 'PharmaSuite · Pharmacy POS', order: 11, profiles: ['Admin_c', 'Pharmacist'] };
+export const nav = { icon: 'ShoppingCart', label: 'Sale', section: 'PharmaSuite · Pharmacy POS', order: 11, profiles: ['VendorOwner','VendorAdmin','Pharmacist'] };
 
 const money = value => '₹' + Number(value || 0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
