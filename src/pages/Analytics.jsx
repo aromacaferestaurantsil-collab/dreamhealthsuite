@@ -45,7 +45,7 @@ export default function Analytics() {
       time(scoped(db.from('pharmacy_sales').select('id,branch_id,invoice_number,subtotal,discount,tax_total,grand_total,payment_status,sale_status,sold_at').eq('tenant_id',tenantId))).order('sold_at',{ascending:false}).limit(5000),
       scoped(db.from('pharmacy_purchase_orders').select('id,branch_id,supplier_id,order_number,supplier_invoice_number,supplier_invoice_date,received_date,total,subtotal,tax_total,status,order_date').eq('tenant_id',tenantId).not('supplier_invoice_number','is',null).gte('supplier_invoice_date',from).lte('supplier_invoice_date',to)).order('supplier_invoice_date',{ascending:false}).limit(5000),
       scoped(db.from('pharmacy_expenses').select('id,branch_id,category,description,amount,expense_date,payment_status,supplier_id').eq('tenant_id',tenantId).gte('expense_date',from).lte('expense_date',to)).order('expense_date',{ascending:false}).limit(5000),
-      scoped(db.from('pharmacy_expense_payments').select('id,tenant_id,expense_id,amount,payment_method,paid_at').eq('tenant_id',tenantId).gte('paid_at',startTs(from)).lt('paid_at',endTs(to))).order('paid_at',{ascending:false}).limit(5000),
+      db.from('pharmacy_expense_payments').select('id,tenant_id,expense_id,amount,payment_method,paid_at').eq('tenant_id',tenantId).gte('paid_at',startTs(from)).lt('paid_at',endTs(to))).order('paid_at',{ascending:false}).limit(5000),
       scoped(db.from('pharmacy_supplier_payments').select('id,branch_id,supplier_id,purchase_order_id,amount,payment_method,reference_number,paid_at').eq('tenant_id',tenantId).gte('paid_at',startTs(from)).lt('paid_at',endTs(to))).order('paid_at',{ascending:false}).limit(5000),
       scoped(db.from('pharmacy_cashbook_entries').select('id,branch_id,entry_type,direction,amount,payment_method,reference_number,description,occurred_at').eq('tenant_id',tenantId).gte('occurred_at',startTs(from)).lt('occurred_at',endTs(to))).order('occurred_at',{ascending:false}).limit(5000),
       scoped(db.from('lab_bookings').select('id,branch_id,booking_number,booking_status,total_amount,booked_at').eq('tenant_id',tenantId).gte('booked_at',startTs(from)).lt('booked_at',endTs(to))).order('booked_at',{ascending:false}).limit(5000),
@@ -57,7 +57,8 @@ export default function Analytics() {
       if (!alive) return;
       const [b,sales,purchases,expenses,expensePayments,supplierPayments,cashbook,labs,appointments,jobs] = results;
       setBranches(b.data||[]);
-      setData({sales:sales.data||[],purchases:purchases.data||[],expenses:expenses.data||[],expensePayments:expensePayments.data||[],supplierPayments:supplierPayments.data||[],cashbook:cashbook.data||[],labs:labs.data||[],appointments:appointments.data||[],jobs:jobs.data||[]});
+      const expenseIds = new Set((expenses.data||[]).map(x=>x.id));
+      setData({sales:sales.data||[],purchases:purchases.data||[],expenses:expenses.data||[],expensePayments:(expensePayments.data||[]).filter(x=>expenseIds.has(x.expense_id)),supplierPayments:supplierPayments.data||[],cashbook:cashbook.data||[],labs:labs.data||[],appointments:appointments.data||[],jobs:jobs.data||[]});
     }).catch(e=>{if(alive)setError(e.message||'Unable to load reports');})
       .finally(()=>{if(alive)setLoading(false);});
     return ()=>{alive=false;};
