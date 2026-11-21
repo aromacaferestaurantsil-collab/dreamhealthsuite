@@ -11,6 +11,7 @@ import {Textarea} from '@/components/ui/textarea';
 import {toast} from 'sonner';
 
 export const route={path:'/patient-portal',layout:'public',access:'authenticated'};
+export const nav={icon:'HeartPulse',label:'My health portal',order:1,profiles:['Patient']};
 const money=v=>'₹'+Number(v||0).toLocaleString('en-IN',{maximumFractionDigits:2});
 const dt=v=>v?new Date(v).toLocaleString('en-IN'):'—';
 export default function PatientPortal(){
