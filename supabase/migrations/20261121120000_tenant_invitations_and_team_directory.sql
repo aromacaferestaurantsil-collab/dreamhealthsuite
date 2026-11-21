@@ -43,13 +43,14 @@ grant execute on function public.list_tenant_team_members(uuid,uuid,text) to aut
 
 create or replace function public.create_tenant_invitation(p_tenant_id uuid,p_email text,p_role text,p_branch_id uuid,p_token_hash text,p_expires_at timestamptz)
 returns uuid language plpgsql security definer set search_path=pg_catalog,public,private as $$
-declare v_actor_role text; v_id uuid;
+declare v_actor_role text; v_actor_branch uuid; v_id uuid;
 begin
  if auth.uid() is null then raise exception 'Authentication required'; end if;
- select role into v_actor_role from public.tenant_memberships where tenant_id=p_tenant_id and user_id=auth.uid() and status='active';
+ select role,branch_id into v_actor_role,v_actor_branch from public.tenant_memberships where tenant_id=p_tenant_id and user_id=auth.uid() and status='active';
  if coalesce(v_actor_role,'') not in ('owner','admin','manager') then raise exception 'Only tenant owner/admin/manager may invite employees'; end if;
  if coalesce(p_role,'') not in ('manager','doctor','pharmacist','lab_technician','pathologist','care_worker','receptionist','analyst','staff') then raise exception 'Invalid invited role'; end if;
  if v_actor_role='manager' and p_role='manager' then raise exception 'Managers cannot invite managers'; end if;
+ if v_actor_role='manager' and v_actor_branch is not null and p_branch_id is distinct from v_actor_branch then raise exception 'A branch manager may only invite employees into their own branch'; end if;
  if p_branch_id is not null and not exists(select 1 from public.branches where tenant_id=p_tenant_id and id=p_branch_id) then raise exception 'Branch does not belong to tenant'; end if;
  if p_email is null or length(trim(p_email))<5 or position('@' in p_email)=0 then raise exception 'Valid invitation email required'; end if;
  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then raise exception 'A SHA-256 token hash is required'; end if;
