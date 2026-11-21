@@ -1,4 +1,4 @@
-import { useEffect,useMemo,useState } from 'react';
+import { useEffect,useMemo,useRef,useState } from 'react';
 import { useAuth } from '@/layouts/RootLayout';
 import { requireSupabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -28,9 +28,11 @@ export default function PharmacyFinance(){
  const [expenseForm,setExpenseForm]=useState({category:'rent',description:'',amount:'',date:today(),supplier:''});
  const [opening,setOpening]=useState(''),[counted,setCounted]=useState(''),[notes,setNotes]=useState('');
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(false);
+ const loadRequest=useRef(0);
 
  async function load(){
-  if(!tenantId)return;
+  if(!tenantId){setBranches([]);setPatients([]);setSuppliers([]);setLedger([]);setAllocations([]);setSessions([]);setEntries([]);setOrders([]);setSupplierPayments([]);setExpenses([]);setExpensePayments([]);setLoading(false);return;}
+  const request=++loadRequest.current;
   setLoading(true);
   try{
    const [b,p,s,l,a,cs,po,sp,ex,ep]=await Promise.all([
@@ -46,15 +48,17 @@ export default function PharmacyFinance(){
     db.from('pharmacy_expense_payments').select('*').eq('tenant_id',tenantId).order('paid_at',{ascending:false}).limit(5000),
    ]);
    for(const x of [b,p,s,l,a,cs,po,sp,ex,ep])if(x.error)throw x.error;
+   if(request!==loadRequest.current)return;
    setBranches(b.data||[]);setPatients(p.data||[]);setSuppliers(s.data||[]);setLedger(l.data||[]);setAllocations(a.data||[]);
    setSessions(cs.data||[]);setOrders(po.data||[]);setSupplierPayments(sp.data||[]);setExpenses(ex.data||[]);setExpensePayments(ep.data||[]);
    const selected=(b.data||[]).some(x=>x.id===branch)?branch:(activeTenant?.branch_id||b.data?.[0]?.id||'');
    setBranch(selected);
    const open=(cs.data||[]).find(x=>x.branch_id===selected&&x.status==='open');
-   if(open){const {data,error}=await db.from('pharmacy_cashbook_entries').select('*').eq('tenant_id',tenantId).eq('session_id',open.id).order('occurred_at',{ascending:false}).limit(1000);if(error)throw error;setEntries(data||[])}else setEntries([]);
-  }catch(e){toast.error(e.message||'Unable to load finance records')}
-  finally{setLoading(false)}
+   if(open){const {data,error}=await db.from('pharmacy_cashbook_entries').select('*').eq('tenant_id',tenantId).eq('session_id',open.id).order('occurred_at',{ascending:false}).limit(1000);if(error)throw error;if(request===loadRequest.current)setEntries(data||[])}else if(request===loadRequest.current)setEntries([]);
+  }catch(e){if(request===loadRequest.current)toast.error(e.message||'Unable to load finance records')}
+  finally{if(request===loadRequest.current)setLoading(false)}
  }
+ useEffect(()=>{loadRequest.current++;setBranch(activeTenant?.branch_id||'');setBranches([]);setPatients([]);setSuppliers([]);setLedger([]);setAllocations([]);setSessions([]);setEntries([]);setOrders([]);setSupplierPayments([]);setExpenses([]);setExpensePayments([])},[tenantId,activeTenant?.branch_id]);
  useEffect(()=>{load()},[tenantId,branch]);
  const scoped=ledger.filter(x=>x.branch_id===branch);
  const scopedOrders=orders.filter(x=>x.branch_id===branch);
