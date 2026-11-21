@@ -146,9 +146,6 @@ export default function OperationalModule({ config }) {
         toast.success('Appointment created and schedule checked');
         setValues({});await load();return;
       }
-      if (entity.table === 'patient_consents' && payload.granted === false && !payload.withdrawn_at) {
-        payload.withdrawn_at = new Date().toISOString();
-      }
       const request = client.from(entity.table);
       if (editingId) {
         const { error: updateError } = await request.update(payload).eq('tenant_id', activeTenant.tenant_id).eq('id', editingId);
