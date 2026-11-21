@@ -19,14 +19,14 @@ const authWrap = (Component) => (
 );
 
 // Auto-discover: eager modules for route metadata + lazy loaders for code-splitting
-const pageMods = import.meta.glob('/src/pages/**/*.jsx', { eager: true });
+const pageRoutes = import.meta.glob('/src/pages/**/*.jsx', { eager: true, import: 'route' });
 const pageLoaders = import.meta.glob('/src/pages/**/*.jsx');
 const NotFoundPage = lazy(() => import('@/pages/NotFound'));
 
-const discoveredRoutes = Object.entries(pageMods)
-  .filter(([, mod]) => mod.route)
-  .map(([filePath, mod]) => ({
-    ...mod.route,
+const discoveredRoutes = Object.entries(pageRoutes)
+  .filter(([, route]) => route)
+  .map(([filePath, route]) => ({
+    ...route,
     _component: lazy(pageLoaders[filePath]),
   }));
 
