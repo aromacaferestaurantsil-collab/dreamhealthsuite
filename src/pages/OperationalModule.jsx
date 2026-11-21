@@ -46,13 +46,24 @@ export default function OperationalModule({ config }) {
       const next = {};
       try {
         for (const lookup of lookups) {
-          let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name')
-            .eq('tenant_id', activeTenant.tenant_id)
-            .order(lookup.labelField || 'name').limit(500);
+          let query = requireSupabase().from(lookup.table).select(lookup.select || 'id,name');
+          if (lookup.tenantScoped !== false) query = query.eq('tenant_id', activeTenant.tenant_id);
           if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
-          const {data,error} = await query;
+          if (lookup.statusField && lookup.activeStatus) query = query.eq(lookup.statusField, lookup.activeStatus);
+          if (lookup.orderBy) query = query.order(lookup.orderBy, {ascending:true});
+          const {data,error} = await query.limit(500);
           if (error) throw error;
-          next[lookup.field] = data || [];
+          let items = data || [];
+          if (lookup.memberUserJoin) {
+            const userIds = items.map(item=>item.user_id).filter(Boolean);
+            if(userIds.length) {
+              const {data:profiles,error:profileError}=await requireSupabase().from('user_profiles').select('user_id,full_name,phone').in('user_id',userIds);
+              if(profileError)throw profileError;
+              const byId=new Map((profiles||[]).map(profile=>[profile.user_id,profile]));
+              items=items.map(item=>({...item,full_name:byId.get(item.user_id)?.full_name||item.user_id}));
+            }
+          }
+          next[lookup.field] = items;
         }
         if (alive) setLookupRows(next);
       } catch (e) {
@@ -87,8 +98,8 @@ export default function OperationalModule({ config }) {
       for (const lookup of (entity.lookups || (entity.lookup ? [entity.lookup] : []))) {
         const lookupValue = payload[lookup.field];
         const records = lookupRows[lookup.field] || [];
-        if (lookup.required !== false && !records.some(item => item.id === lookupValue)) throw new Error('Choose a valid ' + lookup.label + ' from this workspace');
-        if (lookupValue && !records.some(item => item.id === lookupValue)) throw new Error('Selected ' + lookup.label + ' is outside the active workspace');
+        if (lookup.required !== false && !records.some(item => (lookup.valueField ? item[lookup.valueField] : item.id) === lookupValue)) throw new Error('Choose a valid ' + (lookup.label || lookup.field) + ' from this workspace');
+        if (lookupValue && !records.some(item => (lookup.valueField ? item[lookup.valueField] : item.id) === lookupValue)) throw new Error('Selected ' + (lookup.label || lookup.field) + ' is outside the active workspace');
       }
       if (entity.table === 'patient_consents' && payload.granted === false && !payload.withdrawn_at) {
         payload.withdrawn_at = new Date().toISOString();
@@ -155,7 +166,7 @@ export default function OperationalModule({ config }) {
           <form className="space-y-3" onSubmit={createRecord}>
             {entity.fields.filter(f => f.create !== false).map(field => <div key={field.name} className="space-y-1.5">
               <Label>{field.label}{field.required ? ' *' : ''}</Label>
-              {field.lookup ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{(lookupRows[field.name] || []).map(item => <SelectItem key={item.id} value={item.id}>{item[field.lookupLabelField || 'name'] || item.full_name || item.name || item.id}{item.patient_code ? ' · ' + item.patient_code : item.service_code ? ' · ' + item.service_code : ''}</SelectItem>)}</SelectContent></Select>
+              {field.lookup ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{(lookupRows[field.name] || []).map(item => { const value = field.lookupValueField ? item[field.lookupValueField] : item.id; return <SelectItem key={value} value={value}>{item[field.lookupLabelField || 'name'] || item.full_name || item.name || value}{item.patient_code ? ' · ' + item.patient_code : item.service_code ? ' · ' + item.service_code : ''}</SelectItem>; })}</SelectContent></Select>
               : field.options ? <Select value={values[field.name] || ''} onValueChange={v => setValues(old => ({ ...old, [field.name]: v }))}><SelectTrigger><SelectValue placeholder={'Select ' + field.label.toLowerCase()} /></SelectTrigger><SelectContent>{field.options.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}</SelectContent></Select>
               : field.type === 'multiline' ? <textarea className="min-h-20 w-full rounded-md border bg-background px-3 py-2 text-sm" value={values[field.name] || ''} onChange={e => setValues(old => ({ ...old, [field.name]: e.target.value }))} />
               : <Input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'datetime' ? 'datetime-local' : 'text'} step={field.type === 'number' ? '0.01' : undefined} value={values[field.name] || ''} onChange={e => setValues(old => ({ ...old, [field.name]: e.target.value }))} placeholder={field.placeholder || field.label} required={field.required} />}
