@@ -40,3 +40,8 @@ export function validateCartQuantities(cart,stock,holds,asOf=new Date()) {
   }
   return issues;
 }
+
+export function getSaleQuantityStep(medicine) {
+  if (medicine?.allow_loose_sale) return 1;
+  return Math.max(1, Number(medicine?.units_per_pack) || 1);
+}
