@@ -50,6 +50,8 @@ export default function OperationalModule({ config }) {
           if (lookup.tenantScoped !== false) query = query.eq('tenant_id', activeTenant.tenant_id);
           if (lookup.branchScoped && activeTenant.branch_id) query = query.eq('branch_id', activeTenant.branch_id);
           if (lookup.statusField && lookup.activeStatus) query = query.eq(lookup.statusField, lookup.activeStatus);
+          if (lookup.roleField && lookup.role) query = query.eq(lookup.roleField, lookup.role);
+          if (lookup.statusFieldName && lookup.membershipActiveStatus) query = query.eq(lookup.statusFieldName, lookup.membershipActiveStatus);
           if (lookup.orderBy) query = query.order(lookup.orderBy, {ascending:true});
           const {data,error} = await query.limit(500);
           if (error) throw error;
