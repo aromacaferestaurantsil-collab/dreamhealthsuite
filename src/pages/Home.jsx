@@ -54,7 +54,7 @@ export default function Home() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {licensedModules.map(module => <Card key={module.key} className="border-border/70 shadow-sm"><CardHeader><div className="flex items-center gap-3"><div className="rounded-xl bg-secondary p-3 text-primary"><ApperIcon name={module.icon} size={23}/></div><CardTitle className="text-xl">{module.name}</CardTitle></div></CardHeader><CardContent><p className="min-h-12 text-sm leading-6 text-muted-foreground">{module.description}</p><div className="mt-4 border-t pt-3"><Button asChild variant="ghost" size="sm" className="text-primary"><Link to={module.path}>Open module <ApperIcon name="ArrowRight" size={15} className="ml-1"/></Link></Button></div></CardContent></Card>)}
         </div>
-        {!moduleAccess?.status || moduleAccess.status==='loading' ? <p className="text-sm text-muted-foreground">Checking your subscription…</p> : !licensedModules.length ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">No active module licences are available for this workspace. Contact the platform administrator.</p> : null}
+        {moduleAccess?.status !== 'ready' && moduleAccess?.status !== 'error' ? <p className="text-sm text-muted-foreground">Checking your subscription…</p> : !licensedModules.length ? <p className="rounded-lg border p-4 text-sm text-muted-foreground">No active module licences are available for this workspace. Contact the platform administrator.</p> : null}
       </section>
     </div>
   );
