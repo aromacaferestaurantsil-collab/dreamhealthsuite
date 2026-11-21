@@ -118,10 +118,17 @@ export default function OperationalModule({ config }) {
     if (!entity.statusField) return;
     setSaving(true);
     try {
-      const payload = { [entity.statusField]: status };
-      if (entity.withdrawConsent && entity.statusField === 'granted' && status === false) payload.withdrawn_at = new Date().toISOString();
-      const {error} = await requireSupabase().from(entity.table).update(payload).eq('tenant_id',activeTenant.tenant_id).eq('id',row.id);
-      if (error) throw error;
+      if (entity.statusRpc === 'transition_care_job') {
+        const {error} = await requireSupabase().rpc('transition_care_job',{
+          p_job_id:row.id,p_new_status:status,p_notes:'Status changed from Care Connect workspace',p_location:null
+        });
+        if(error) throw error;
+      } else {
+        const payload = { [entity.statusField]: status };
+        if (entity.withdrawConsent && entity.statusField === 'granted' && status === false) payload.withdrawn_at = new Date().toISOString();
+        const {error} = await requireSupabase().from(entity.table).update(payload).eq('tenant_id',activeTenant.tenant_id).eq('id',row.id);
+        if (error) throw error;
+      }
       toast.success(entity.singular + ' status updated');
       await load();
     } catch (e) { toast.error(e.message || 'Could not update status'); }
