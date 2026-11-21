@@ -18,7 +18,7 @@ const catalogue = {
   'care-connect': { key:'care_connect', name:'Care Connect', icon:'Truck', audience:'Delivery and collection operations', path:'/care-connect', capabilities:['Delivery and collection work queues','Medicine delivery status and OTP confirmation','Home sample collection and barcode handover','Assignment and reassignment','Attendance and payment reports'] },
   analytics: { key:'health_analytics', name:'HealthAnalytics', icon:'ChartNoAxesCombined', audience:'Healthcare business intelligence', path:'/analytics', capabilities:['Pharmacy sales, margins and inventory reports','Laboratory bookings and turnaround','Doctor schedule and performance','Branch and module comparisons','PDF and spreadsheet reporting'] }
 };
-const aliases = { pharmacy:'pharmacy', pharmacy_suite:'pharmacy', laboratory:'laboratory', lab_suite:'laboratory', doctors:'doctors', doctor_suite:'doctors', patients:'patients', patient_suite:'patients', 'care-connect':'care-connect', care_connect:'care-connect', careconnect:'care-connect', analytics:'analytics', health_analytics:'analytics' };
+const aliases = { pharmacy:'pharmacy', pharmacy_suite:'pharmacy', laboratory:'laboratory', laboratory_suite:'laboratory', lab_suite:'laboratory', doctors:'doctors', doctor_suite:'doctors', patients:'patients', patient_suite:'patients', 'care-connect':'care-connect', care_connect:'care-connect', careconnect:'care-connect', analytics:'analytics', health_analytics:'analytics' };
 
 export default function ModuleWorkspace() {
   const location = useLocation();
