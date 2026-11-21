@@ -47,6 +47,10 @@ export default function TeamMembers(){
   finally{setLoading(false);}
  },[tenantId]);
  useEffect(()=>{load();},[load]);
+ useEffect(()=>{
+  setForm(current=>({...current,branch_id:activeTenant?.role==='manager'&&activeTenant?.branch_id?activeTenant.branch_id:'all'}));
+  setCreatedInvite(null);
+ },[tenantId,activeTenant?.role,activeTenant?.branch_id]);
  async function createInvitation(e){
   e.preventDefault();if(!tenantId)return;
   const email=form.email.trim().toLowerCase();
