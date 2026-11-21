@@ -40,6 +40,8 @@ export function useOwnerLayoutData() {
     return matched?.redirectAfterAuth ?? GENERIC_AUTH?.redirectAfterAuth ?? '/';
   }, [user?.profile]);
   const navItems = useMemo(() => uniqueNavItems.filter(item => {
+    if (['Patient','Doctor'].includes(user?.profile) && item.path !== (user.profile==='Patient'?'/patient-portal':'/doctor-portal')) return false;
+    if (!['Patient','Doctor'].includes(user?.profile) && ['/patient-portal','/doctor-portal'].includes(item.path)) return false;
     if (item.profiles && !item.profiles.includes(user?.profile)) return false;
     const moduleKey = moduleForPath(item.to);
     if (!moduleKey) return true;
