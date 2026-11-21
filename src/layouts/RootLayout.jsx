@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { supabase } from '@/lib/supabase';
 import { setUser, clearUser, setInitialized } from '@/store/userSlice';
 import { verifyRouteAccess } from '@/router/route.utils';
+import { requireSupabase } from '@/lib/supabase';
 import { APP_CONFIG } from '@/config/app.config';
 import AppLoader from '@/components/AppLoader';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -24,6 +25,14 @@ const roleProfiles = {
   pathologist: 'Pathologist', care_worker: 'CareWorker', receptionist: 'Receptionist',
   analyst: 'Analyst', staff: 'Staff',
 };
+const moduleRouteRules = [
+  { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-workflows$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
+  { match: /^\/laboratory(?:\/|$)/, key: 'laboratory_suite', roles: ['owner','admin','manager','pathologist','lab_technician'] },
+  { match: /^\/doctors?(?:\/|$)/, key: 'doctor_suite', roles: ['owner','admin','manager','doctor','receptionist'] },
+  { match: /^\/patients?(?:\/|$)/, key: 'patient_suite', roles: ['owner','admin','manager','receptionist','doctor','pharmacist','lab_technician','pathologist'] },
+  { match: /^\/care-connect(?:\/|$)/, key: 'care_connect', roles: ['owner','admin','manager','care_worker'] },
+  { match: /^\/analytics(?:\/|$)/, key: 'analytics', roles: ['owner','admin','analyst'] },
+];
 
 export default function RootLayout() {
   const dispatch = useDispatch();
@@ -31,6 +40,7 @@ export default function RootLayout() {
   const [memberships,setMemberships] = useState([]);
   const [activeTenantId,setActiveTenantId] = useState('');
   const [authReady,setAuthReady] = useState(false);
+  const [moduleAccess,setModuleAccess] = useState({status:'idle',tenantId:'',keys:[]});
   const location = useLocation();
   const navigate = useNavigate();
   const matches = useMatches();
@@ -85,9 +95,42 @@ export default function RootLayout() {
     else if (user && user.profile !== 'NoTenant' && location.pathname === '/workspace/new') navigate('/', { replace: true });
   }, [user, location.pathname, navigate]);
 
+  const routeRule = moduleRouteRules.find(rule => rule.match.test(location.pathname));
+  useEffect(() => {
+    let alive = true;
+    async function checkModuleAccess() {
+      if (!routeRule || !activeTenant?.tenant_id || !user) {
+        if (alive) setModuleAccess({status:'not-required',tenantId:activeTenant?.tenant_id??'',keys:[]});
+        return;
+      }
+      setModuleAccess({status:'loading',tenantId:activeTenant.tenant_id,keys:[]});
+      try {
+        const {data,error}=await requireSupabase().rpc('get_my_module_entitlements',{p_tenant_id:activeTenant.tenant_id});
+        if(error) throw error;
+        if(alive) setModuleAccess({status:'ready',tenantId:activeTenant.tenant_id,keys:(data??[]).filter(row=>row.enabled).map(row=>row.module_key)});
+      } catch(error) {
+        if(alive) setModuleAccess({status:'error',tenantId:activeTenant.tenant_id,keys:[],message:error.message});
+      }
+    }
+    checkModuleAccess();
+    return ()=>{alive=false;};
+  },[routeRule?.key,activeTenant?.tenant_id,user?.id,location.pathname]);
+
   const deepestMatch = matches[matches.length-1];
   const accessRule = deepestMatch?.handle?.access ?? 'public';
-  const allowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
+  const baseAllowed = authReady && isInitialized && verifyRouteAccess(accessRule,user);
+  const roleAllowed = !routeRule || routeRule.roles.includes(activeTenant?.role);
+  const moduleKeyAliases = {
+    pharmacy_suite:['pharmacy_suite','pharmacy'],
+    laboratory_suite:['laboratory_suite','lab_suite','laboratory','lab'],
+    doctor_suite:['doctor_suite','doctor','doctors'],
+    patient_suite:['patient_suite','patient','patients'],
+    care_connect:['care_connect','care','careconnect'],
+    analytics:['analytics','health_analytics'],
+  };
+  const entitlementAllowed = !routeRule || (moduleAccess.status==='ready' && moduleAccess.tenantId===activeTenant?.tenant_id && moduleKeyAliases[routeRule.key].some(key=>moduleAccess.keys.includes(key)));
+  const moduleCheckPending = !!routeRule && ['idle','loading'].includes(moduleAccess.status);
+  const allowed = baseAllowed && roleAllowed && entitlementAllowed && !moduleCheckPending;
 
   useEffect(()=>{
     if(!authReady || !isInitialized) return;
@@ -96,6 +139,11 @@ export default function RootLayout() {
       else navigate(`${APP_CONFIG.defaultLoginRoute??'/login'}?redirect=${encodeURIComponent(location.pathname+location.search)}`,{replace:true});
     }
   },[location.pathname,authReady,isInitialized,allowed,user,navigate]);
+
+  useEffect(()=>{
+    if(!authReady || !isInitialized || !routeRule || moduleCheckPending) return;
+    if(moduleAccess.status==='error' || !roleAllowed || !entitlementAllowed) navigate('/access-denied',{replace:true});
+  },[location.pathname,authReady,isInitialized,routeRule?.key,moduleAccess.status,moduleCheckPending,roleAllowed,entitlementAllowed,navigate]);
 
   const handleLogout = async () => {
     if(supabase) await supabase.auth.signOut();
