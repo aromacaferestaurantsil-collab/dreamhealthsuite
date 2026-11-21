@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cartRequiresPrescription, getAvailableBatches, getFefoLineSubtotal, validateCartQuantities } from '../src/lib/pharmacy-pos-logic.js';
+import { cartRequiresPrescription, getAvailableBatches, getFefoLineSubtotal, getSaleQuantityStep, validateCartQuantities } from '../src/lib/pharmacy-pos-logic.js';
 const stock=[
  {id:'late',medicine_id:'m1',expiry_date:'2027-12-01',received_at:'2026-01-02',quantity_on_hand:8,selling_rate:12},
  {id:'early',medicine_id:'m1',expiry_date:'2027-01-01',received_at:'2026-01-01',quantity_on_hand:10,selling_rate:10},
@@ -26,4 +26,10 @@ test('cart validation rejects overdrawn and non-positive quantities',()=>{
  const issues=validateCartQuantities([{medicineId:'m1',quantity:16},{medicineId:'m2',quantity:1},{medicineId:'m1',quantity:0}],stock,holds,'2026-11-21');
  assert.equal(issues.length,2);assert.equal(issues[0].reason,'quantity_exceeds_available');assert.equal(issues[0].available,15);
  assert.equal(issues[1].reason,'quantity_must_be_positive');
+});
+
+test('POS quantity step respects pack-only and loose-unit settings',()=>{
+ assert.equal(getSaleQuantityStep({allow_loose_sale:true,units_per_pack:10}),1);
+ assert.equal(getSaleQuantityStep({allow_loose_sale:false,units_per_pack:10}),10);
+ assert.equal(getSaleQuantityStep({allow_loose_sale:false,units_per_pack:null}),1);
 });
