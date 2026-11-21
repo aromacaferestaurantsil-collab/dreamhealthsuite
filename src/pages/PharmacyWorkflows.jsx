@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 
 export const route = { path: '/pharmacy-workflows', layout: 'owner', access: 'authenticated' };
-export const nav = { icon: 'ClipboardList', label: 'Operations & registers', section: 'PharmaSuite · Management', order: 14, profiles: ['Admin_c','Manager','Pharmacist'] };
+export const nav = { icon: 'ClipboardList', label: 'Operations & registers', section: 'PharmaSuite · Management', order: 14, profiles: ['VendorOwner','VendorAdmin','Manager','Pharmacist'] };
 const Field=({label,children})=><div className="space-y-1.5"><Label>{label}</Label>{children}</div>;
 const today=()=>new Date().toISOString().slice(0,10);
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
