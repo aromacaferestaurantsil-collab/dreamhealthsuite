@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { supabase, requireSupabase } from '@/lib/supabase';
 import AuthLayout from './AuthLayout';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,10 @@ import { Label } from '@/components/ui/label';
 
 export default function AuthPage({ mode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile: profileParam } = useParams();
+  const redirectTarget = new URLSearchParams(location.search).get('redirect');
+  const safeRedirect = redirectTarget && redirectTarget.startsWith('/') && !redirectTarget.startsWith('//') ? redirectTarget : null;
   const [email,setEmail] = useState('');
   const [password,setPassword] = useState('');
   const [confirmPassword,setConfirmPassword] = useState('');
@@ -33,14 +36,14 @@ export default function AuthPage({ mode }) {
           options: {
             data: { full_name: fullName.trim() },
             // Return confirmation links to the deployed web app, not a localhost default.
-            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}${safeRedirect || '/accept-invite'}`,
           },
         });
         if (authError) throw authError;
         if (data.session && data.user) {
           await client.from('user_profiles').upsert({ user_id: data.user.id, full_name: fullName.trim() }, { onConflict: 'user_id' });
           const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
-          navigate(!patientLinkError && linkedPatient ? '/pharmacy-order' : '/accept-invite', { replace: true });
+          navigate(safeRedirect || (!patientLinkError && linkedPatient ? '/pharmacy-order' : '/accept-invite'), { replace: true });
         } else {
           setNotice('Check your email to confirm your account. After confirmation, sign in using the invitation sent by your organisation administrator. Workspace access requires an approved invitation.');
         }
@@ -52,7 +55,7 @@ export default function AuthPage({ mode }) {
         const { data: linkedPatient, error: patientLinkError } = await client.rpc('link_patient_profile_by_verified_email');
         if (!patientLinkError && linkedPatient) { navigate('/pharmacy-order', { replace: true }); return; }
         const { data: membershipRows } = await client.from('tenant_memberships').select('id').eq('user_id',(await client.auth.getUser()).data.user.id).eq('status','active').limit(1);
-        navigate(membershipRows?.length ? '/' : '/accept-invite', { replace: true });
+        navigate(safeRedirect || (membershipRows?.length ? '/' : '/accept-invite'), { replace: true });
       }
     } catch (e) {
       setError(e?.message || 'Authentication failed.');
