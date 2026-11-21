@@ -25,8 +25,8 @@ const roleProfiles = {
   analyst: 'Analyst', staff: 'Staff',
 };
 const moduleRouteRules = [
-  { match: /^\\/doctor-portal$/, key: null, roles: ['doctor'] },
-  { match: /^\\/patient-portal$/, key: null, roles: ['patient'] },
+  { match: /^\/doctor-portal$/, key: null, roles: ['doctor'] },
+  { match: /^\/patient-portal$/, key: null, roles: ['patient'] },
   { match: /^\/pharmacy\/pos$/, key: 'pharmacy_suite', roles: ['owner','admin','pharmacist'] },
   { match: /^\/team-members$/, key: null, roles: ['owner','admin','manager'] },
   { match: /^\/pharmacy(?:\/|$)|^\/pharmacy-workflows$/, key: 'pharmacy_suite', roles: ['owner','admin','manager','pharmacist'] },
