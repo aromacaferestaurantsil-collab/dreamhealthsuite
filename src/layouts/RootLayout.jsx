@@ -98,7 +98,7 @@ export default function RootLayout() {
   useEffect(() => {
     let alive = true;
     async function checkModuleAccess() {
-      if (!routeRule || !activeTenant?.tenant_id || !user) {
+      if (!activeTenant?.tenant_id || !user) {
         if (alive) setModuleAccess({status:'not-required',tenantId:activeTenant?.tenant_id??'',keys:[]});
         return;
       }
@@ -113,7 +113,7 @@ export default function RootLayout() {
     }
     checkModuleAccess();
     return ()=>{alive=false;};
-  },[routeRule?.key,activeTenant?.tenant_id,user?.id,location.pathname]);
+  },[activeTenant?.tenant_id,user?.id]);
 
   const deepestMatch = matches[matches.length-1];
   const accessRule = deepestMatch?.handle?.access ?? 'public';
